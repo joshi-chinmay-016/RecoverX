@@ -1,0 +1,58 @@
+{
+  "event": "payment.failed",
+  "account_id": "acc_Ey6i3LMzZ5L5iB",
+  "entity": {
+    "id": "pay_Iy6i3LMzZ5L5iB",
+    "entity": "payment",
+    "amount": 1000,
+    "currency": "INR",
+    "status": "failed",
+    "order_id": "order_Iy6i3LMzZ5L5iB",
+    "invoice_id": null,
+    "international": false,
+    "method": "upi",
+    "amount_refunded": 0,
+    "refund_status": null,
+    "captured": false,
+    "description": "Payment for order #123",
+    "card_id": null,
+    "bank": null,
+    "wallet": null,
+    "vpa": "customer@upi",
+    "email": "customer@example.com",
+    "contact": "9876543210",
+    "customer_id": "cust_Iy6i3LMzZ5L5iB",
+    "token_id": null,
+    "notes": {
+      "order_id": "123"
+    },
+    "fee": 0,
+    "tax": 0,
+    "error_code": "BAD_REQUEST_ERROR",
+    "error_description": "The payment failed due to a technical issue",
+    "error_source": "api",
+    "error_step": "payment_authorization",
+    "error_reason": "api_request_failed",
+    "created_at": 1692448000,
+    "acquirer_data": {
+      "auth_code": null
+    },
+    "udf1": null,
+    "udf2": null,
+    "udf3": null,
+    "offer_id": null,
+    "offer_type": null,
+    "amount_off": 0,
+    "mrp": 0,
+    "reference_id": "pay_Iy6i3LMzZ5L5iB",
+    "customer": {
+      "id": "cust_Iy6i3LMzZ5L5iB",
+      "name": "John Doe",
+      "email": "customer@example.com",
+      "contact": "9876543210",
+      "gstin": null,
+      "notes": []
+    }
+  },
+  "created_at": 1692448000
+}
