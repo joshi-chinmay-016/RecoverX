@@ -2,7 +2,7 @@
 
 ## Overview
 
-RecoverX is an autonomous AI revenue-recovery platform for the Razorpay AI Internship challenge. Phase 1 establishes the financial event foundation that all later phases depend on, implementing a production-quality backend capable of receiving Razorpay webhook events, verifying authenticity, handling duplicate delivery safely, and maintaining normalized payment state.
+RecoverX is an autonomous AI revenue-recovery platform. Phase 1 establishes the financial event foundation that all later phases depend on, implementing a production-quality backend capable of receiving Razorpay webhook events, verifying authenticity, handling duplicate delivery safely, and maintaining normalized payment state.
 
 ## Phase 1 Architecture
 
@@ -518,11 +518,3 @@ Phase 2 will build on this foundation to add:
 - Payment failure pattern recognition
 - Customer risk profiling
 - Advanced recovery case prioritization
-
-## Interview Story
-
-"We started with an event-driven modular monolith because payment systems are fundamentally event-driven. We preserve the immutable Razorpay event and separately maintain normalized financial state. Because webhook delivery is at-least-once and can arrive out of order, we designed idempotent processing and explicit state transitions from day one. This foundation later allows our AI agent to reason over reliable financial state without giving the LLM direct authority over money."
-
-## License
-
-This project is part of the Razorpay AI Internship challenge.
