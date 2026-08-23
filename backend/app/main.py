@@ -6,6 +6,7 @@ from app.core.logging import setup_logging
 from app.modules.webhooks.router import webhook_router
 from app.modules.payments.router import payment_router
 from app.modules.recovery.router import recovery_router
+from app.intelligence.router import intelligence_router
 
 setup_logging()
 
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(webhook_router, prefix="/api/v1/webhooks", tags=["webhooks"])
 app.include_router(payment_router, prefix="/api/v1/payments", tags=["payments"])
 app.include_router(recovery_router, prefix="/api/v1/recovery", tags=["recovery"])
+app.include_router(intelligence_router, prefix="/api/v1/intelligence", tags=["intelligence"])
 
 
 @app.get("/api/v1/health")

@@ -5,6 +5,7 @@ from app.db.models.payment_attempt import PaymentAttempt
 from app.db.models.webhook_event import WebhookEvent
 from app.db.models.recovery_case import RecoveryCase
 from app.db.models.audit_event import AuditEvent
+from app.db.models.revenue_intelligence import RevenueIntelligenceResult
 
 __all__ = [
     "Merchant",
@@ -14,4 +15,5 @@ __all__ = [
     "WebhookEvent",
     "RecoveryCase",
     "AuditEvent",
+    "RevenueIntelligenceResult",
 ]

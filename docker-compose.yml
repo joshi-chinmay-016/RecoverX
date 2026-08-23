@@ -75,5 +75,15 @@ services:
       - ./backend:/app
     command: python -m app.workers.webhook_worker
 
+  frontend:
+    image: nginx:alpine
+    container_name: recoverx-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
