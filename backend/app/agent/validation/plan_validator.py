@@ -59,22 +59,15 @@ class PlanValidator:
             
             # Construct RecoveryPlan
             plan = RecoveryPlan(
-                opportunity_id=plan_data.get("opportunity_id", ""),
-                payment_id=plan_data.get("payment_id", ""),
-                merchant_id=plan_data.get("merchant_id", ""),
-                summary=plan_data["summary"],
-                diagnosis=plan_data["diagnosis"],
+                summary=self.sanitize_untrusted_data(plan_data["summary"]),
+                diagnosis=self.sanitize_untrusted_data(plan_data["diagnosis"]),
                 selected_strategy=ActionType(selected_strategy),
-                reasoning=plan_data["reasoning"],
+                reasoning=self.sanitize_untrusted_data(plan_data["reasoning"]),
                 confidence=confidence,
                 proposed_actions=validated_actions,
-                alternatives_considered=plan_data.get("alternatives_considered", []),
-                required_inputs=plan_data.get("required_inputs", []),
-                risks=plan_data.get("risks", []),
-                constraints=plan_data.get("constraints", []),
-                fallback_strategy=plan_data["fallback_strategy"],
-                requires_approval=plan_data["requires_approval"],
-                policy_status=plan_data.get("policy_status", "UNKNOWN"),
+                fallback_strategy=ActionType(plan_data["fallback_strategy"]) if plan_data.get("fallback_strategy") else None,
+                requires_approval=plan_data.get("requires_approval", False),
+                approval_reason=plan_data.get("approval_reason"),
             )
             
             return True, None, plan
@@ -84,18 +77,19 @@ class PlanValidator:
             return False, f"Validation failed: {str(e)}", None
     
     def _validate_action(self, action_data: Dict[str, Any]) -> tuple[bool, Optional[str], Optional[AgentAction]]:
-        """Validate a single action."""
+        """Validate a single proposed action."""
         try:
             # Check required fields
             required_fields = ["action_type", "purpose", "rationale", "expected_outcome"]
             for field in required_fields:
                 if field not in action_data:
-                    return False, f"Missing required field: {field}", None
+                    return False, f"Missing required field in action: {field}", None
             
-            # Validate action type
             action_type_str = action_data["action_type"]
+            
+            # Check action is allowed
             if not ActionRegistry.is_action_allowed(action_type_str):
-                return False, f"Invalid action type: {action_type_str}", None
+                return False, f"Action type not allowed: {action_type_str}", None
             
             # Validate parameters against schema
             action_type = ActionType(action_type_str)
@@ -127,12 +121,14 @@ class PlanValidator:
         dangerous_patterns = [
             "ignore all previous instructions",
             "ignore previous instructions",
+            "ignore instructions",
             "forget all instructions",
             "system:",
             "assistant:",
             "user:",
             "<system>",
             "</system>",
+            "override all safety",
         ]
         
         sanitized = data.lower()

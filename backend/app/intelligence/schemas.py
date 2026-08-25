@@ -76,7 +76,7 @@ class RevenueAtRisk(BaseModel):
 
 
 class RecoveryProbability(BaseModel):
-    """Estimated recovery likelihood with contributing factors."""
+    """Deterministic rules-based recovery likelihood estimate with contributing factors."""
     probability: float = Field(ge=0.0, le=1.0, description="Estimated recovery likelihood (0.0 to 1.0)")
     factors: List[Dict[str, Any]] = []
 

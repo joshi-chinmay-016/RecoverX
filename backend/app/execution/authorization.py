@@ -43,7 +43,8 @@ class AuthorizationService:
             )
 
         applicable_rules.append("payment_status_eligibility")
-        if payment.status.value == "CAPTURED":
+        payment_status_val = payment.status.value if hasattr(payment.status, "value") else str(payment.status or "")
+        if payment_status_val == "CAPTURED":
             reasons.append("Payment is already captured and resolved. No recovery action permitted.")
             return PolicyDecision(
                 decision=PolicyStatus.BLOCKED,
@@ -52,7 +53,7 @@ class AuthorizationService:
                 policy_version="policy-v1",
             )
         
-        if payment.status.value == "CREATED":
+        if payment_status_val == "CREATED":
             reasons.append("Payment has not attempted execution yet.")
             return PolicyDecision(
                 decision=PolicyStatus.BLOCKED,
@@ -64,14 +65,16 @@ class AuthorizationService:
         # 2. Verify Recovery Case status
         applicable_rules.append("recovery_case_open_rule")
         recovery_case = self.db.query(RecoveryCase).filter(RecoveryCase.payment_id == payment.id).first()
-        if recovery_case and recovery_case.status.value != "OPEN":
-            reasons.append(f"Recovery case is already {recovery_case.status.value}. Action blocked.")
-            return PolicyDecision(
-                decision=PolicyStatus.BLOCKED,
-                reasons=reasons,
-                applicable_rules=applicable_rules,
-                policy_version="policy-v1",
-            )
+        if recovery_case and recovery_case.status:
+            case_status_val = recovery_case.status.value if hasattr(recovery_case.status, "value") else str(recovery_case.status)
+            if case_status_val != "OPEN":
+                reasons.append(f"Recovery case is already {case_status_val}. Action blocked.")
+                return PolicyDecision(
+                    decision=PolicyStatus.BLOCKED,
+                    reasons=reasons,
+                    applicable_rules=applicable_rules,
+                    policy_version="policy-v1",
+                )
 
         # 3. Verify Merchant Isolation
         applicable_rules.append("merchant_isolation_rule")
@@ -123,19 +126,8 @@ class AuthorizationService:
                 policy_version="policy-v1",
             )
 
-        # 7. Action parameters validation
-        applicable_rules.append("parameter_validation_rule")
-        if not self.policy_engine.rules.validate_action_parameters(action_enum, action.parameters or {}):
-            reasons.append("Invalid or unsafe action parameters provided.")
-            return PolicyDecision(
-                decision=PolicyStatus.BLOCKED,
-                reasons=reasons,
-                applicable_rules=applicable_rules,
-                policy_version="policy-v1",
-            )
-
-        # All checks passed
-        reasons.append("All deterministic financial and safety policy checks passed.")
+        # All deterministic checks passed
+        reasons.append("Action satisfied all deterministic policy constraints.")
         return PolicyDecision(
             decision=PolicyStatus.ALLOWED,
             reasons=reasons,

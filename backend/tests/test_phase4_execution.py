@@ -3,7 +3,7 @@
 import pytest
 import uuid
 from datetime import datetime
-from unittest.mock import AsyncMock
+from unittest.mock import MagicMock, AsyncMock
 
 from app.db.base import (
     PaymentStatus,
@@ -28,9 +28,9 @@ from app.execution.schemas import ProviderResult
 
 
 @pytest.fixture
-def mock_db_session(mocker):
+def mock_db_session():
     """Create a mock database session."""
-    session = mocker.MagicMock()
+    session = MagicMock()
     return session
 
 
@@ -40,7 +40,7 @@ def sample_merchant():
         id=uuid.uuid4(),
         external_id="merch_test_1",
         name="Test Merchant",
-        is_active=True,
+        currency="INR",
     )
 
 
@@ -49,14 +49,14 @@ def sample_payment(sample_merchant):
     payment_id = uuid.uuid4()
     return Payment(
         id=payment_id,
-        razorpay_payment_id=f"pay_test_{uuid.uuid4().hex[:8]}",
         merchant_id=sample_merchant.id,
+        razorpay_payment_id="pay_test_phase4_123",
         amount_minor=2500000,
         currency="INR",
-        status=PaymentStatus.FAILED,
         method="upi",
-        failure_code="BANK_GATEWAY_TIMEOUT",
-        failure_description="Transaction timed out at acquiring bank",
+        status=PaymentStatus.FAILED,
+        failure_code="BAD_REQUEST_ERROR",
+        failure_description="Bank technical error",
     )
 
 
@@ -71,51 +71,60 @@ def sample_recovery_case(sample_payment):
 
 
 @pytest.fixture
-def sample_opportunity(sample_payment):
-    return RevenueIntelligenceResult(
-        id=uuid.uuid4(),
-        payment_id=sample_payment.id,
-        merchant_id=sample_payment.merchant_id,
-        failure_category="TEMPORARY_FAILURE",
-        recovery_likelihood=0.85,
-        opportunity_score=90.0,
-        priority="HIGH",
-        recommended_intervention="WAIT_AND_RETRY",
-        explanation="Temporary network issue with high recovery probability",
-        is_actionable=True,
-    )
-
-
-@pytest.fixture
-def sample_action(sample_payment, sample_opportunity):
+def sample_action(sample_merchant, sample_payment):
     return RecoveryAction(
         id=uuid.uuid4(),
-        action_id=f"ACT-{uuid.uuid4().hex[:8].upper()}",
-        opportunity_id=sample_opportunity.id,
+        action_id="ACT-UNITTEST-001",
+        opportunity_id=uuid.uuid4(),
+        merchant_id=sample_merchant.id,
         payment_id=sample_payment.id,
-        merchant_id=sample_payment.merchant_id,
         action_type=ActionType.RETRY_PAYMENT,
         status=ActionStatus.PROPOSED,
-        parameters={"delay_minutes": 0},
-        idempotency_key=f"idem_test_{uuid.uuid4().hex[:8]}",
+        idempotency_key=f"idem_act_test_001",
         execution_attempts_count=0,
         max_attempts=3,
-        policy_version="policy-v1",
-        execution_version="execution-v1",
-        requested_at=datetime.utcnow(),
+        parameters={"reason": "Deterministic automated retry"},
     )
 
 
 # ==============================================================================
-# 1. State Machine Tests
+# 1. State Machine Transition Tests
 # ==============================================================================
 
-def test_state_machine_valid_transitions():
-    """Verify standard valid state transitions."""
-    assert ActionStateMachine.transition(ActionStatus.PROPOSED, ActionStatus.POLICY_CHECK) == ActionStatus.POLICY_CHECK
-    assert ActionStateMachine.transition(ActionStatus.POLICY_CHECK, ActionStatus.AUTHORIZED) == ActionStatus.AUTHORIZED
-    assert ActionStateMachine.transition(ActionStatus.AUTHORIZED, ActionStatus.EXECUTING) == ActionStatus.EXECUTING
-    assert ActionStateMachine.transition(ActionStatus.EXECUTING, ActionStatus.SUCCEEDED) == ActionStatus.SUCCEEDED
+def test_state_machine_valid_happy_path_transitions():
+    """Verify standard happy-path lifecycle: PROPOSED -> POLICY_CHECK -> AUTHORIZED -> QUEUED -> EXECUTING -> SUCCEEDED."""
+    s1 = ActionStateMachine.transition(ActionStatus.PROPOSED, ActionStatus.POLICY_CHECK)
+    assert s1 == ActionStatus.POLICY_CHECK
+
+    s2 = ActionStateMachine.transition(ActionStatus.POLICY_CHECK, ActionStatus.AUTHORIZED)
+    assert s2 == ActionStatus.AUTHORIZED
+
+    s3 = ActionStateMachine.transition(ActionStatus.AUTHORIZED, ActionStatus.QUEUED)
+    assert s3 == ActionStatus.QUEUED
+
+    s4 = ActionStateMachine.transition(ActionStatus.QUEUED, ActionStatus.EXECUTING)
+    assert s4 == ActionStatus.EXECUTING
+
+    s5 = ActionStateMachine.transition(ActionStatus.EXECUTING, ActionStatus.SUCCEEDED)
+    assert s5 == ActionStatus.SUCCEEDED
+    assert ActionStateMachine.is_terminal(s5) is True
+
+
+def test_state_machine_policy_block_transition():
+    """Verify policy engine rejection: POLICY_CHECK -> BLOCKED."""
+    s = ActionStateMachine.transition(ActionStatus.POLICY_CHECK, ActionStatus.BLOCKED)
+    assert s == ActionStatus.BLOCKED
+    assert ActionStateMachine.is_terminal(s) is True
+
+
+def test_state_machine_timeout_to_unknown_transition():
+    """Verify timeout scenario: EXECUTING -> UNKNOWN."""
+    s = ActionStateMachine.transition(ActionStatus.EXECUTING, ActionStatus.UNKNOWN)
+    assert s == ActionStatus.UNKNOWN
+    assert ActionStateMachine.is_terminal(s) is False
+
+    s_rec = ActionStateMachine.transition(ActionStatus.UNKNOWN, ActionStatus.SUCCEEDED)
+    assert s_rec == ActionStatus.SUCCEEDED
 
 
 def test_state_machine_retryable_transitions():
@@ -126,15 +135,12 @@ def test_state_machine_retryable_transitions():
 
 def test_state_machine_forbidden_transitions():
     """Verify that illegal transitions raise InvalidStateTransitionError."""
-    # Blocked cannot jump to executing
     with pytest.raises(InvalidStateTransitionError):
         ActionStateMachine.transition(ActionStatus.BLOCKED, ActionStatus.EXECUTING)
 
-    # Succeeded cannot execute again (Terminal state)
     with pytest.raises(InvalidStateTransitionError):
         ActionStateMachine.transition(ActionStatus.SUCCEEDED, ActionStatus.EXECUTING)
 
-    # Cancelled cannot execute
     with pytest.raises(InvalidStateTransitionError):
         ActionStateMachine.transition(ActionStatus.CANCELLED, ActionStatus.EXECUTING)
 
@@ -143,9 +149,9 @@ def test_state_machine_forbidden_transitions():
 # 2. Deterministic Authorization Engine Tests
 # ==============================================================================
 
-def test_authorization_allowed_for_eligible_failed_payment(mocker, sample_payment, sample_recovery_case, sample_action):
+def test_authorization_allowed_for_eligible_failed_payment(sample_payment, sample_recovery_case, sample_action):
     """Eligible failed payment with low retry count must be ALLOWED."""
-    mock_db = mocker.MagicMock()
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_payment,       # query Payment
         sample_recovery_case, # query RecoveryCase
@@ -159,10 +165,10 @@ def test_authorization_allowed_for_eligible_failed_payment(mocker, sample_paymen
     assert "max_retry_limit_rule" in decision.applicable_rules
 
 
-def test_authorization_blocks_already_captured_payment(mocker, sample_payment, sample_recovery_case, sample_action):
+def test_authorization_blocks_already_captured_payment(sample_payment, sample_recovery_case, sample_action):
     """Payment that is already CAPTURED must be BLOCKED from recovery execution."""
     sample_payment.status = PaymentStatus.CAPTURED
-    mock_db = mocker.MagicMock()
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_payment,
         sample_recovery_case,
@@ -175,10 +181,10 @@ def test_authorization_blocks_already_captured_payment(mocker, sample_payment, s
     assert any("already captured" in r.lower() for r in decision.reasons)
 
 
-def test_authorization_blocks_when_max_retries_exceeded(mocker, sample_payment, sample_recovery_case, sample_action):
+def test_authorization_blocks_when_max_retries_exceeded(sample_payment, sample_recovery_case, sample_action):
     """Actions exceeding maximum allowed retry attempts must be BLOCKED."""
-    sample_action.execution_attempts_count = 3  # Max limit reached
-    mock_db = mocker.MagicMock()
+    sample_action.execution_attempts_count = 3
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_payment,
         sample_recovery_case,
@@ -191,10 +197,10 @@ def test_authorization_blocks_when_max_retries_exceeded(mocker, sample_payment, 
     assert any("maximum retry attempt limit reached" in r.lower() for r in decision.reasons)
 
 
-def test_authorization_blocks_merchant_isolation_breach(mocker, sample_payment, sample_recovery_case, sample_action):
+def test_authorization_blocks_merchant_isolation_breach(sample_payment, sample_recovery_case, sample_action):
     """Action requested with mismatched merchant_id must be strictly BLOCKED."""
-    sample_action.merchant_id = uuid.uuid4()  # Mismatched merchant
-    mock_db = mocker.MagicMock()
+    sample_action.merchant_id = uuid.uuid4()
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_payment,
         sample_recovery_case,
@@ -212,18 +218,17 @@ def test_authorization_blocks_merchant_isolation_breach(mocker, sample_payment, 
 # ==============================================================================
 
 @pytest.mark.asyncio
-async def test_execution_success_updates_payment_and_case(mocker, sample_payment, sample_recovery_case, sample_action):
+async def test_execution_success_updates_payment_and_case(sample_payment, sample_recovery_case, sample_action):
     """Successful execution must capture the payment and resolve the recovery case."""
     sample_action.status = ActionStatus.AUTHORIZED
     sample_action.payment = sample_payment
 
-    mock_db = mocker.MagicMock()
-    # Mock queries: 1) action lookup, 2) auth payment, 3) auth case, 4) idempotency check, 5) exec payment, 6) recovery case
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_action,
         sample_payment,
         sample_recovery_case,
-        None,  # No existing attempt (idempotency check)
+        None,
         sample_payment,
         sample_recovery_case,
     ]
@@ -241,7 +246,7 @@ async def test_execution_success_updates_payment_and_case(mocker, sample_payment
 
 
 @pytest.mark.asyncio
-async def test_execution_idempotency_duplicate_safety(mocker, sample_payment, sample_recovery_case, sample_action):
+async def test_execution_idempotency_duplicate_safety(sample_payment, sample_recovery_case, sample_action):
     """Duplicate execution with identical idempotency key returns cached result without calling provider twice."""
     sample_action.status = ActionStatus.AUTHORIZED
     sample_action.payment = sample_payment
@@ -256,15 +261,15 @@ async def test_execution_idempotency_duplicate_safety(mocker, sample_payment, sa
         provider_reference="mock_pay_cached_9999",
     )
 
-    mock_db = mocker.MagicMock()
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_action,
         sample_payment,
         sample_recovery_case,
-        existing_successful_attempt,  # Existing attempt found!
+        existing_successful_attempt,
     ]
 
-    mock_adapter = mocker.MagicMock()
+    mock_adapter = MagicMock()
     service = ExecutionService(mock_db, payment_adapter=mock_adapter)
 
     result = await service.execute_action(sample_action.action_id, custom_idempotency_key="idem_fixed_key")
@@ -272,17 +277,16 @@ async def test_execution_idempotency_duplicate_safety(mocker, sample_payment, sa
     assert result.success is True
     assert result.provider_reference == "mock_pay_cached_9999"
     assert "Idempotent duplicate request" in result.message
-    # Adapter was NOT called because of idempotency interception
     mock_adapter.execute_retry.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_execution_timeout_marks_unknown_and_blocks_blind_retry(mocker, sample_payment, sample_recovery_case, sample_action):
+async def test_execution_timeout_marks_unknown_and_blocks_blind_retry(sample_payment, sample_recovery_case, sample_action):
     """Provider timeout marks action as UNKNOWN and strictly prevents blind retries."""
     sample_action.status = ActionStatus.AUTHORIZED
     sample_action.payment = sample_payment
 
-    mock_db = mocker.MagicMock()
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_action,
         sample_payment,
@@ -300,17 +304,16 @@ async def test_execution_timeout_marks_unknown_and_blocks_blind_retry(mocker, sa
     assert result.is_unknown is True
     assert result.is_retryable is False
     assert sample_action.status == ActionStatus.UNKNOWN
-    # Payment status remains unchanged (NOT captured)
     assert sample_payment.status == PaymentStatus.FAILED
 
 
 @pytest.mark.asyncio
-async def test_reconciliation_resolves_unknown_action(mocker, sample_payment, sample_recovery_case, sample_action):
+async def test_reconciliation_resolves_unknown_action(sample_payment, sample_recovery_case, sample_action):
     """Reconciling an UNKNOWN action queries provider and updates financial truth safely."""
     sample_action.status = ActionStatus.UNKNOWN
     sample_action.provider_reference = "mock_pay_rec_1234"
 
-    mock_db = mocker.MagicMock()
+    mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.side_effect = [
         sample_action,
         sample_payment,

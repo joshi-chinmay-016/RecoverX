@@ -72,6 +72,11 @@ class ActionStateMachine:
         return target_status in allowed
 
     @classmethod
+    def is_terminal(cls, status: ActionStatus) -> bool:
+        """Check if the given status is a terminal state."""
+        return len(cls.VALID_TRANSITIONS.get(status, set())) == 0
+
+    @classmethod
     def transition(cls, current_status: ActionStatus, target_status: ActionStatus) -> ActionStatus:
         """Validate and return the target status or raise InvalidStateTransitionError."""
         if not cls.can_transition(current_status, target_status):

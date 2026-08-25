@@ -9,6 +9,8 @@ from app.db.models.revenue_intelligence import RevenueIntelligenceResult
 from app.db.models.agent_run import AgentRun, AgentToolCall
 from app.db.models.recovery_action import RecoveryAction
 from app.db.models.execution_attempt import ExecutionAttempt
+from app.db.models.learning_model_snapshot import LearningModelSnapshot
+from app.db.models.learning_outcome import LearningOutcomeRecord
 
 __all__ = [
     "Merchant",
@@ -23,4 +25,6 @@ __all__ = [
     "AgentToolCall",
     "RecoveryAction",
     "ExecutionAttempt",
+    "LearningModelSnapshot",
+    "LearningOutcomeRecord",
 ]

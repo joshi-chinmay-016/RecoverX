@@ -9,12 +9,13 @@ from app.modules.recovery.router import recovery_router
 from app.intelligence.router import intelligence_router
 from app.agent.router import agent_router
 from app.execution.router import router as execution_router
+from app.learning.router import router as learning_router
 
 setup_logging()
 
 app = FastAPI(
     title="RecoverX API",
-    description="Autonomous AI Revenue Recovery Platform",
+    description="Adaptive AI Revenue Recovery Platform",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -34,8 +35,9 @@ app.include_router(recovery_router, prefix="/api/v1/recovery", tags=["recovery"]
 app.include_router(intelligence_router, prefix="/api/v1/intelligence", tags=["intelligence"])
 app.include_router(agent_router, prefix="/api/v1/agent", tags=["agent"])
 app.include_router(execution_router, prefix="/api/v1")
+app.include_router(learning_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")
 async def health_check():
-    return {"status": "ok", "version": "1.0.0", "phase": "4"}
+    return {"status": "ok", "version": "1.0.0", "phase": "5", "adaptive_learning": "active"}

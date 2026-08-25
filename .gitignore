@@ -73,3 +73,5 @@ backend/alembic/versions/*.pyc
 # OS
 .DS_Store
 Thumbs.db
+powershell.bat
+

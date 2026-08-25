@@ -1,4 +1,4 @@
-"""Tool Registry for Phase 3 AI Recovery Agent.
+"""Tool Registry for Phase 3 AI Recovery Agent (Extended with Phase 5 Adaptive Strategy Evidence).
 
 Manages safe, read-only tools that the agent is allowed to execute during reasoning.
 Enforces read-only boundaries and records execution metrics for audit trails.
@@ -15,6 +15,7 @@ from app.agent.tools.intelligence import get_revenue_intelligence
 from app.agent.tools.merchant_context import get_merchant_context
 from app.agent.tools.policy import get_recovery_policy
 from app.agent.tools.allowed_actions import get_allowed_actions
+from app.agent.tools.strategy_evidence import get_recovery_strategy_evidence
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -32,6 +33,7 @@ class ToolRegistry:
             "get_merchant_context": self._run_get_merchant_context,
             "get_recovery_policy": self._run_get_recovery_policy,
             "get_allowed_actions": self._run_get_allowed_actions,
+            "get_recovery_strategy_evidence": self._run_get_recovery_strategy_evidence,
         }
 
     def list_tools(self) -> Dict[str, str]:
@@ -43,6 +45,7 @@ class ToolRegistry:
             "get_merchant_context": "Retrieve merchant aggregate statistics and recovery rates (merchant_id required)",
             "get_recovery_policy": "Retrieve current deterministic policy rules and limits",
             "get_allowed_actions": "Retrieve list of all allowed recovery actions and schemas",
+            "get_recovery_strategy_evidence": "Retrieve Phase 5 empirical strategy rankings, historical yields, and alternatives (opportunity_id or payment_id required)",
         }
 
     def is_tool_allowed(self, tool_name: str) -> bool:
@@ -122,3 +125,11 @@ class ToolRegistry:
 
     def _run_get_allowed_actions(self, params: Dict[str, Any]) -> Dict[str, Any]:
         return get_allowed_actions(params)
+
+    def _run_get_recovery_strategy_evidence(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        return get_recovery_strategy_evidence(
+            self.db,
+            opportunity_id=params.get("opportunity_id"),
+            payment_id=params.get("payment_id"),
+            failure_category=params.get("failure_category"),
+        )
