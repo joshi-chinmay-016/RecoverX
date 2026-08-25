@@ -1,13 +1,14 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
+from uuid import UUID
 from datetime import datetime
 from app.db.base import RecoveryCaseStatus
 
 
 class RecoveryCaseResponse(BaseModel):
     """Schema for recovery case response."""
-    id: str
-    payment_id: str
+    id: Union[UUID, str]
+    payment_id: Union[UUID, str]
     status: RecoveryCaseStatus
     amount_at_risk_minor: int
     created_at: datetime

@@ -1,166 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RecoverX - Revenue Intelligence Dashboard</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>RecoverX Revenue Intelligence</h1>
-            <p class="subtitle">Phase 2: Revenue Intelligence Engine</p>
-        </header>
-
-        <!-- Top-level Cards -->
-        <div class="cards-grid">
-            <div class="card revenue-at-risk">
-                <div class="card-header">
-                    <h3>Revenue at Risk</h3>
-                    <span class="icon">⚠️</span>
-                </div>
-                <div class="card-value" id="revenueAtRisk">₹0</div>
-                <div class="card-subtitle">Total failed revenue</div>
-            </div>
-
-            <div class="card estimated-recoverable">
-                <div class="card-header">
-                    <h3>Estimated Recoverable</h3>
-                    <span class="icon">💰</span>
-                </div>
-                <div class="card-value" id="estimatedRecoverable">₹0</div>
-                <div class="card-subtitle">Potentially recoverable</div>
-            </div>
-
-            <div class="card failed-revenue">
-                <div class="card-header">
-                    <h3>Failed Revenue</h3>
-                    <span class="icon">❌</span>
-                </div>
-                <div class="card-value" id="failedRevenue">₹0</div>
-                <div class="card-subtitle">Total failed transactions</div>
-            </div>
-
-            <div class="card high-priority">
-                <div class="card-header">
-                    <h3>High Priority</h3>
-                    <span class="icon">🔥</span>
-                </div>
-                <div class="card-value" id="highPriorityCount">0</div>
-                <div class="card-subtitle">Critical opportunities</div>
-            </div>
-        </div>
-
-        <!-- Revenue Risk Overview -->
-        <div class="section">
-            <h2>Revenue Risk Overview</h2>
-            <div class="risk-overview">
-                <div class="risk-bar">
-                    <div class="risk-bar-fill" id="riskBarFill" style="width: 0%"></div>
-                </div>
-                <div class="risk-legend">
-                    <div class="legend-item">
-                        <span class="legend-color at-risk"></span>
-                        <span>Revenue at Risk: <strong id="riskAtRisk">₹0</strong></span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color recoverable"></span>
-                        <span>Estimated Recoverable: <strong id="riskRecoverable">₹0</strong></span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color recovered"></span>
-                        <span>Recovered: <strong id="riskRecovered">₹0</strong></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Failure Analysis -->
-        <div class="section">
-            <h2>Failure Analysis</h2>
-            <div class="analysis-grid">
-                <div class="analysis-card">
-                    <h3>Failure Distribution</h3>
-                    <div class="chart-container" id="failureDistributionChart">
-                        <div class="chart-placeholder">Loading...</div>
-                    </div>
-                </div>
-                <div class="analysis-card">
-                    <h3>Top Failure Reasons</h3>
-                    <div class="top-reasons" id="topFailureReasons">
-                        <div class="chart-placeholder">Loading...</div>
-                    </div>
-                </div>
-                <div class="analysis-card">
-                    <h3>Priority Distribution</h3>
-                    <div class="priority-distribution" id="priorityDistribution">
-                        <div class="chart-placeholder">Loading...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recovery Opportunities -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Recovery Opportunities</h2>
-                <div class="filters">
-                    <select id="priorityFilter" class="filter-select">
-                        <option value="">All Priorities</option>
-                        <option value="CRITICAL">Critical</option>
-                        <option value="HIGH">High</option>
-                        <option value="MEDIUM">Medium</option>
-                        <option value="LOW">Low</option>
-                    </select>
-                    <select id="categoryFilter" class="filter-select">
-                        <option value="">All Categories</option>
-                        <option value="TEMPORARY_FAILURE">Temporary Failure</option>
-                        <option value="INSUFFICIENT_FUNDS">Insufficient Funds</option>
-                        <option value="NETWORK_FAILURE">Network Failure</option>
-                        <option value="AUTHENTICATION_FAILURE">Authentication Failure</option>
-                        <option value="BANK_FAILURE">Bank Failure</option>
-                    </select>
-                    <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
-                </div>
-            </div>
-            <div class="opportunities-table-container">
-                <table class="opportunities-table">
-                    <thead>
-                        <tr>
-                            <th>Payment ID</th>
-                            <th>Amount</th>
-                            <th>Failure</th>
-                            <th>Recovery Probability</th>
-                            <th>Opportunity Score</th>
-                            <th>Priority</th>
-                            <th>Recommended Action</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="opportunitiesTableBody">
-                        <tr>
-                            <td colspan="8" class="loading">Loading opportunities...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Opportunity Detail Modal -->
-    <div id="opportunityModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Opportunity Details</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <div class="loading">Loading...</div>
-            </div>
-        </div>
-    </div>
-
-    <script src="app.js"></script>
-</body>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366F1'><path d='M13 2L3 14h9l-1 8 10-12h-9l1-8z'/></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RecoverX — Autonomous AI Revenue Recovery Platform</title>
+    <meta name="description" content="Production-grade autonomous AI revenue recovery platform combining deterministic financial intelligence with bounded reasoning." />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-[#0B0F19] text-gray-100 min-h-screen antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

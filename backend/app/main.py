@@ -7,6 +7,7 @@ from app.modules.webhooks.router import webhook_router
 from app.modules.payments.router import payment_router
 from app.modules.recovery.router import recovery_router
 from app.intelligence.router import intelligence_router
+from app.agent.router import agent_router
 
 setup_logging()
 
@@ -30,8 +31,9 @@ app.include_router(webhook_router, prefix="/api/v1/webhooks", tags=["webhooks"])
 app.include_router(payment_router, prefix="/api/v1/payments", tags=["payments"])
 app.include_router(recovery_router, prefix="/api/v1/recovery", tags=["recovery"])
 app.include_router(intelligence_router, prefix="/api/v1/intelligence", tags=["intelligence"])
+app.include_router(agent_router, prefix="/api/v1/agent", tags=["agent"])
 
 
 @app.get("/api/v1/health")
 async def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "1.0.0", "phase": "3"}

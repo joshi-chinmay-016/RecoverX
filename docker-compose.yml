@@ -1,19 +1,17 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: recoverx-postgres
     environment:
-      POSTGRES_DB: recoverx
-      POSTGRES_USER: recoverx
-      POSTGRES_PASSWORD: 123cj123CJ*
+      POSTGRES_DB: ${POSTGRES_DB:-recoverx}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U recoverx"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -37,13 +35,21 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://recoverx:123cj123CJ*@postgres:5432/recoverx
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
       - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
       - APP_ENV=development
       - LOG_LEVEL=INFO
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gemini-1.5-flash}
+      - MAX_RETRY_ATTEMPTS=${MAX_RETRY_ATTEMPTS:-3}
+      - AGENT_CONFIDENCE_THRESHOLD=${AGENT_CONFIDENCE_THRESHOLD:-0.5}
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,8 +65,8 @@ services:
       dockerfile: Dockerfile
     container_name: recoverx-worker
     environment:
-      - DATABASE_URL=postgresql://recoverx:123cj123CJ*@postgres:5432/recoverx
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
       - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}

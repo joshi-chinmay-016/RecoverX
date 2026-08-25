@@ -13,3 +13,7 @@ def setup_logging():
 
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
+
+
+# Default root application logger
+logger = logging.getLogger("recoverx")

@@ -17,8 +17,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enums for intelligence
-    failure_category_enum = sa.Enum(
+    # Safely create PostgreSQL enums if they do not exist
+    sa.Enum(
         'PAYMENT_METHOD_FAILURE',
         'INSUFFICIENT_FUNDS',
         'BANK_FAILURE',
@@ -28,19 +28,37 @@ def upgrade() -> None:
         'TEMPORARY_FAILURE',
         'UNKNOWN',
         name='failurecategory'
-    )
+    ).create(op.get_bind(), checkfirst=True)
     
-    priority_level_enum = sa.Enum(
+    sa.Enum(
         'LOW',
         'MEDIUM',
         'HIGH',
         'CRITICAL',
         name='prioritylevel'
+    ).create(op.get_bind(), checkfirst=True)
+
+    failure_category_enum = postgresql.ENUM(
+        'PAYMENT_METHOD_FAILURE',
+        'INSUFFICIENT_FUNDS',
+        'BANK_FAILURE',
+        'NETWORK_FAILURE',
+        'AUTHENTICATION_FAILURE',
+        'LIMIT_EXCEEDED',
+        'TEMPORARY_FAILURE',
+        'UNKNOWN',
+        name='failurecategory',
+        create_type=False
     )
     
-    # Create enums
-    failure_category_enum.create(op.get_bind())
-    priority_level_enum.create(op.get_bind())
+    priority_level_enum = postgresql.ENUM(
+        'LOW',
+        'MEDIUM',
+        'HIGH',
+        'CRITICAL',
+        name='prioritylevel',
+        create_type=False
+    )
     
     # Create revenue_intelligence_results table
     op.create_table(
@@ -79,18 +97,22 @@ def upgrade() -> None:
         sa.Column('updated_at', sa.DateTime(), nullable=False),
         
         # Foreign keys
-        sa.ForeignKeyConstraint(['payment_id'], ['payments.id'], ),
-        sa.ForeignKeyConstraint(['recovery_case_id'], ['recovery_cases.id'], )
+        sa.ForeignKeyConstraint(['payment_id'], ['payments.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['recovery_case_id'], ['recovery_cases.id'], ondelete='SET NULL')
     )
     
-    # Create index for payment_id (already unique, but good for queries)
-    op.create_index('ix_revenue_intelligence_results_payment_id', 'revenue_intelligence_results', ['payment_id'], unique=True)
+    # Create indexes for efficient querying
+    op.create_index(op.f('ix_revenue_intelligence_results_payment_id'), 'revenue_intelligence_results', ['payment_id'], unique=True)
+    op.create_index(op.f('ix_revenue_intelligence_results_recovery_case_id'), 'revenue_intelligence_results', ['recovery_case_id'])
+    op.create_index(op.f('ix_revenue_intelligence_results_priority'), 'revenue_intelligence_results', ['priority'])
+    op.create_index(op.f('ix_revenue_intelligence_results_failure_category'), 'revenue_intelligence_results', ['failure_category'])
+    op.create_index(op.f('ix_revenue_intelligence_results_opportunity_score'), 'revenue_intelligence_results', ['opportunity_score'])
 
 
 def downgrade() -> None:
-    op.drop_index('ix_revenue_intelligence_results_payment_id', table_name='revenue_intelligence_results')
+    # Drop table
     op.drop_table('revenue_intelligence_results')
     
     # Drop enums
-    sa.Enum(name='prioritylevel').drop(op.get_bind())
-    sa.Enum(name='failurecategory').drop(op.get_bind())
+    sa.Enum(name='prioritylevel').drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name='failurecategory').drop(op.get_bind(), checkfirst=True)

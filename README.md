@@ -1,107 +1,91 @@
+# RecoverX — Autonomous AI Revenue Recovery Platform
 
-# RecoverX — Phase 2: Revenue Intelligence Engine
+RecoverX is an enterprise-grade autonomous AI revenue-recovery platform built as a modular monolith in FastAPI/PostgreSQL. It turns failed payment webhooks into deterministic financial truth, extracts explainable revenue intelligence, and deploys a bounded AI agent to reason over and synthesize structured recovery plans.
 
-## Overview
+---
 
-RecoverX is an autonomous AI revenue-recovery platform. 
-
-**Phase 1** established the financial event foundation that all later phases depend on, implementing a production-quality backend capable of receiving Razorpay webhook events, verifying authenticity, handling duplicate delivery safely, and maintaining normalized payment state.
-
-**Phase 2** builds a production-quality Revenue Intelligence Engine that analyzes payment failures, calculates revenue at risk, estimates recovery probability, scores opportunities, and recommends interventions. This intelligence layer is completely deterministic and explainable—no LLM is used for financial scoring.
-
-## Phase 1 Architecture
+## 🏛️ Architectural Overview & Core Boundaries
 
 ```
-Razorpay Test Mode
-        ↓
-Webhook Event
-        ↓
-Signature Verification (HMAC-SHA256)
-        ↓
-Idempotency Check (x-razorpay-event-id)
-        ↓
-Raw Event Persistence (WebhookEvent)
-        ↓
-Async Queue (Redis)
-        ↓
-Background Processing
-        ↓
-Payment Normalization (Payment, PaymentAttempt)
-        ↓
-Recovery Case Creation (RecoveryCase)
-        ↓
-Audit Trail (AuditEvent)
-        ↓
-API Inspection
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: FINANCIAL EVENT FOUNDATION (Financial Truth)                   │
+│ Webhook Ingestion (HMAC-SHA256) → Idempotency → Normalized State        │
+│ (Payment, PaymentAttempt, Merchant, Customer) → Recovery Case → Audit   │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: REVENUE INTELLIGENCE ENGINE (Deterministic Intelligence)       │
+│ Feature Extraction → Failure Classifier → Revenue-at-Risk Calculator    │
+│ → Recovery Likelihood Engine → Merchant-Relative Opportunity Scorer     │
+│ → Intervention Engine → Persistent revenue_intelligence_results         │
+│ (STRICT RULE: NO LLM USED FOR FINANCIAL CALCULATIONS OR SCORING)        │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: AI RECOVERY AGENT (Bounded AI Reasoning & Planning)            │
+│ Read-only Tool Registry → Context Builder → LLM Provider Abstraction    │
+│ (Gemini / Groq / OpenAI / Mock) → Structured RecoveryPlan Schema        │
+│ → Deterministic PolicyEngine Gate (ALLOWED / BLOCKED / REQUIRES_APPROVAL│
+│ → Safe Decision Trace & Persisted agent_runs                            │
+│ (STRICT BOUNDARY: PHASE 3 PLANS ACTIONS — EXECUTION STRICTLY DISABLED)  │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ (Phase 4 Boundary)
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: CONTROLLED ACTION EXECUTION (Future Action Boundary)           │
+│ Approved Plan Execution, Automated Smart Retries, Multi-channel Comms   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Phase 2 Architecture
+---
 
-```
-Phase 1 Financial State
-        ↓
-Revenue Intelligence Engine
-        ↓
-+--> Feature Extraction
-+--> Failure Classification
-+--> Revenue-at-Risk Calculation
-+--> Recovery Probability
-+--> Opportunity Score
-+--> Intervention Recommendation
-+--> Explanation Generator
-        ↓
-Intelligence API
-        ↓
-Frontend Revenue Intelligence Dashboard
-```
+## 🚀 Key Architectural Pillars
 
-### Key Architectural Decisions
+### 1. Phase 1 — Financial Truth Foundation
+- **Webhook HMAC-SHA256 Verification**: Cryptographically verifies incoming provider signatures against raw byte payload with constant-time comparison to prevent timing attacks.
+- **Strict Idempotency**: Guarantees that duplicate webhooks (using `x-razorpay-event-id`) never create duplicate records or state transitions.
+- **Normalized Domain Models**: Distinct database entities for `Merchant`, `Customer`, `Payment`, `PaymentAttempt`, `RecoveryCase`, and `AuditEvent`.
+- **Out-of-Order Resiliency**: Payment state machine allows transition from `FAILED` to `CAPTURED` or `AUTHORIZED` if asynchronous webhooks arrive out of sequence.
+- **Merchant Isolation**: All domain queries and audit records enforce merchant tenancy.
 
-**Modular Monolith**: We chose a modular monolith architecture using FastAPI, PostgreSQL, SQLAlchemy, Alembic, Redis, and Docker. This provides transactional consistency and development speed without introducing premature distributed-system complexity.
+### 2. Phase 2 — Deterministic Revenue Intelligence
+- **No LLM in Financial Calculations**: Financial scoring, risk calculations, and recovery likelihood are 100% deterministic, testable, reproducible, and explainable.
+- **Merchant-Relative Value Normalization**: Instead of arbitrary global thresholds, transaction value is evaluated relative to the merchant's historical distribution (`normalized_value_score`, `transaction_value_percentile`).
+- **Bounded Scoring (0-100)**: Opportunity score balances merchant-relative transaction value (40%), recovery likelihood (40%), value percentile (10%), time sensitivity (±10%), and retry context (±15%).
+- **Model Versioning**: Every intelligence result records `model_version` (e.g. `rules-v1`) alongside structured contributing factors.
 
-**PostgreSQL for Financial Domain**: Our core relationships are strongly relational (Merchant → Customer → Payment → PaymentAttempt → RecoveryCase). PostgreSQL provides transactions, unique constraints, foreign keys, and strong consistency.
+### 3. Phase 3 — AI Recovery Agent & Bounded Reasoning
+- **Untrusted Reasoning Component**: The LLM is treated as an untrusted reasoning component, never a financial authority.
+- **LLM Provider Abstraction**: Supports Google Gemini (`gemini-1.5-flash`), Groq (`llama3-70b-8192`), OpenAI (`gpt-4o-mini`), and a deterministic `MockLLMProvider` for offline testing.
+- **Read-Only Tool Registry**: The agent only has access to read-only diagnostic tools (`get_payment_context`, `get_recovery_history`, `get_revenue_intelligence`, `get_merchant_context`, `get_recovery_policy`, `get_allowed_actions`). No database writes, SQL execution, or HTTP mutations.
+- **Allowed-Action Registry**: Prohibited from inventing arbitrary actions. Must select from explicitly registered actions:
+  - `RETRY_PAYMENT`
+  - `REQUEST_ALTERNATE_PAYMENT_METHOD`
+  - `SEND_PAYMENT_REMINDER`
+  - `REQUEST_REAUTHENTICATION`
+  - `WAIT_AND_RETRY`
+  - `MANUAL_REVIEW`
+  - `CLOSE_RECOVERY_CASE`
+  - `ESCALATE`
+- **Deterministic PolicyEngine**: The agent proposes; the `PolicyEngine` decides. The PolicyEngine enforces maximum retry limits, payment eligibility, recovery case state, parameter constraints, and approval requirements. The LLM can never override the PolicyEngine.
+- **Prompt-Injection Defense**: All untrusted payment metadata and customer failure descriptions are sanitized and isolated within explicit XML boundary tags (`<UNTRUSTED_PAYMENT_DATA>`, `<UNTRUSTED_FAILURE_DATA>`).
+- **Safe Decision Trace**: Persists structured observation, evidence, decision, reason, and confidence without exposing raw chain-of-thought or sensitive data.
 
-**Raw Event + Normalized State**: We preserve the immutable Razorpay event in WebhookEvent for auditability and separately maintain normalized domain state (Payment, PaymentAttempt, RecoveryCase) for efficient queries and business logic.
+---
 
-**Webhook Signature Verification**: We verify Razorpay signatures using HMAC-SHA256 against the raw HTTP request body (not re-serialized JSON) with constant-time comparison to prevent timing attacks.
+## 🛠️ Environment Configuration
 
-**Idempotent Event Processing**: Using `x-razorpay-event-id` with a unique constraint ensures duplicate webhook delivery creates no duplicate domain objects.
+Copy `.env.example` to `.env` and configure your credentials:
 
-**Out-of-Order Event Handling**: Our state transition logic supports valid later events (e.g., FAILED → CAPTURED) to handle webhooks that may arrive out of order.
-
-**Deterministic Intelligence (Phase 2)**: Financial scoring is completely deterministic and explainable. No LLM is used for financial calculations—this makes the system safer, cheaper, easier to test, easier to audit, and easier to explain to judges. AI/LLM can be introduced later for natural-language explanations and adaptive strategies.
-
-**Intelligence vs Action Separation**: Phase 2 produces intelligence and recommendations only. It does NOT execute payment actions, refunds, retries, or customer messages. This boundary ensures safety and auditability.
-
-## Local Setup
-
-### Prerequisites
-
-- Docker and Docker Compose
-- Python 3.11+ (for local development)
-- PostgreSQL 15+ (if running locally without Docker)
-
-### Quick Start with Docker
-
-1. Clone the repository:
-```bash
-git clone https://github.com/joshi-chinmay-016/RecoverX.git
-cd RecoverX
-```
-
-2. Create environment file:
-```bash
-cp .env.example .env
-```
-
-3. Update `.env` with your credentials:
 ```bash
 # Razorpay Configuration
 RAZORPAY_KEY_ID=rzp_test_your_key_id_here
 RAZORPAY_KEY_SECRET=your_secret_here
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret_here
 
-# Database (already configured in docker-compose.yml)
+# Database
 DATABASE_URL=postgresql://recoverx:password@localhost:5432/recoverx
 
 # Redis
@@ -110,708 +94,126 @@ REDIS_URL=redis://localhost:6379/0
 # Application
 APP_ENV=development
 LOG_LEVEL=INFO
+
+# LLM Provider (Phase 3)
+LLM_PROVIDER=gemini  # Options: gemini, groq, openai, mock
+GEMINI_API_KEY=your_gemini_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+LLM_API_KEY=
+LLM_MODEL=gemini-1.5-flash
+LLM_TIMEOUT_SECONDS=30
+MAX_AGENT_STEPS=6
+AGENT_VERSION=agent-v1
+PROMPT_VERSION=recovery-prompt-v1
+POLICY_VERSION=policy-v1
+
+# Agent Policy Configuration
+MAX_RETRY_ATTEMPTS=3
+AGENT_CONFIDENCE_THRESHOLD=0.5
 ```
 
-4. Start the development environment:
+---
+
+## ⚡ Quick Start with Docker
+
+1. **Start all services**:
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-This will start:
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- FastAPI backend (port 8000)
-- Webhook worker
-
-5. Run database migrations:
+2. **Apply database migrations**:
 ```bash
 docker compose exec backend alembic upgrade head
 ```
 
-6. (Optional) Seed development data:
-```bash
-docker compose exec backend python scripts/seed_data.py
-```
-
-7. (Optional) Seed Phase 2 demo data:
+3. **Seed demo data & run Phase 2 intelligence analysis**:
 ```bash
 docker compose exec backend python scripts/seed_demo_data.py
+docker compose exec backend python scripts/seed_agent_demo.py
 ```
 
-8. Run intelligence analysis on demo data:
+4. **Access the Application**:
+- **React + TypeScript Production Dashboard**: `http://localhost:5173/` (or port `8080` in Docker)
+- **Interactive OpenAPI Docs**: `http://localhost:8000/api/docs`
+- **Health Check**: `http://localhost:8000/api/v1/health`
+
+### 💻 Running Frontend Locally:
 ```bash
-docker compose exec backend python -c "from app.db.session import SessionLocal; from app.intelligence.intelligence_service import IntelligenceService; from app.db.models.payment import Payment; db = SessionLocal(); payments = db.query(Payment).filter(Payment.status.value == 'FAILED').all(); service = IntelligenceService(db); [service.analyze_payment(p) for p in payments]; print('Analysis complete')"
+cd frontend
+npm install
+npm run dev
 ```
 
-### Local Development without Docker
+---
 
-1. Install dependencies:
+## 🔌 API Reference
+
+### Phase 1: Payments, Webhooks & Recovery
+- `POST /api/v1/webhooks/razorpay` — Ingest and verify Razorpay webhook (HMAC-SHA256, idempotent)
+- `GET /api/v1/payments` — List normalized payments
+- `GET /api/v1/payments/{payment_id}` — Get single payment detail
+- `GET /api/v1/recovery/cases` — List recovery cases
+- `GET /api/v1/recovery/cases/{case_id}` — Inspect single recovery case
+
+### Phase 2: Revenue Intelligence
+- `GET /api/v1/intelligence/overview` — Aggregated revenue metrics and risk distributions
+- `GET /api/v1/intelligence/opportunities` — Paginated and filterable recovery opportunities
+- `GET /api/v1/intelligence/opportunities/{result_id}` — Full telemetry & contributing factors for an opportunity
+- `POST /api/v1/intelligence/analyze/{payment_id}` — Analyze single payment deterministically
+- `POST /api/v1/intelligence/analyze` — Batch payment analysis
+
+### Phase 3: AI Recovery Agent
+- `POST /api/v1/agent/analyze/{opportunity_id}` — Launch AI agent investigation and plan synthesis
+- `POST /api/v1/agent/preview/{opportunity_id}` — Dry run plan preview (no database persistence)
+- `GET /api/v1/agent/runs/{run_id}` — Retrieve complete persisted agent run, plan, and validation result
+- `GET /api/v1/agent/runs/{run_id}/trace` — Retrieve safe decision trace and tool execution audit
+
+---
+
+## 🧪 Comprehensive Test Suite
+
+The test suite covers all unit, integration, evaluation, and security scenarios across all three phases:
+
 ```bash
-cd backend
-pip install -r requirements.txt
+# Run all tests
+pytest backend/tests/ -v
+
+# Run Phase 1 tests
+pytest backend/tests/test_idempotency.py backend/tests/test_signature_verification.py backend/tests/test_state_transitions.py backend/tests/test_webhook_processing.py -v
+
+# Run Phase 2 tests
+pytest backend/tests/test_intelligence_components.py backend/tests/test_intelligence_integration.py backend/tests/test_scenario_validation.py -v
+
+# Run Phase 3 tests
+pytest backend/tests/test_agent_components.py backend/tests/test_agent_security.py backend/tests/test_agent_evaluation.py -v
 ```
 
-2. Set up PostgreSQL and Redis locally
-
-3. Configure environment variables in `.env`
-
-4. Run migrations:
-```bash
-alembic upgrade head
-```
-
-5. Start the backend:
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-6. Start the worker (in another terminal):
-```bash
-python -m app.workers.webhook_worker
-```
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `RAZORPAY_KEY_ID` | Razorpay API key ID | Yes |
-| `RAZORPAY_KEY_SECRET` | Razorpay API key secret | Yes |
-| `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook secret for signature verification | Yes |
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `REDIS_URL` | Redis connection string | Yes |
-| `APP_ENV` | Application environment (development/production) | No |
-| `LOG_LEVEL` | Logging level (DEBUG/INFO/WARNING/ERROR) | No |
-
-## Database Migrations
-
-We use Alembic for database schema management.
-
-### Create a new migration:
-```bash
-alembic revision --autogenerate -m "Description of changes"
-```
-
-### Apply migrations:
-```bash
-alembic upgrade head
-```
-
-### Rollback migrations:
-```bash
-alembic downgrade -1
-```
-
-### View migration history:
-```bash
-alembic history
-```
-
-## Database Schema
-
-### Core Entities
-
-**Merchant**: Represents a business entity receiving payments
-- `id` (UUID, PK)
-- `name` (String)
-- `external_id` (String, unique)
-- `currency` (String, default: INR)
-
-**Customer**: Represents a customer making payments
-- `id` (UUID, PK)
-- `external_customer_id` (String, unique)
-- `email` (String, optional)
-- `phone` (String, optional)
-
-**Payment**: Represents a logical payment
-- `id` (UUID, PK)
-- `razorpay_payment_id` (String, unique)
-- `razorpay_order_id` (String, optional)
-- `merchant_id` (UUID, FK)
-- `customer_id` (UUID, FK, optional)
-- `amount_minor` (Integer) - stored in paise (minor units)
-- `currency` (String)
-- `status` (Enum: CREATED, AUTHORIZED, CAPTURED, FAILED)
-- `method` (String, optional)
-- `failure_code` (String, optional)
-- `failure_description` (String, optional)
-
-**PaymentAttempt**: Represents individual payment attempts
-- `id` (UUID, PK)
-- `payment_id` (UUID, FK)
-- `attempt_number` (Integer)
-- `status` (Enum)
-- `failure_code` (String, optional)
-- `failure_description` (String, optional)
-- `method` (String, optional)
-- `started_at` (DateTime)
-- `completed_at` (DateTime, optional)
-- Unique constraint: (payment_id, attempt_number)
-
-**WebhookEvent**: Immutable provider event
-- `id` (UUID, PK)
-- `provider_event_id` (String, unique)
-- `provider` (String, default: razorpay)
-- `event_type` (String)
-- `payload` (JSONB)
-- `signature_verified` (Boolean)
-- `processing_status` (Enum: RECEIVED, PROCESSING, PROCESSED, FAILED, IGNORED)
-- `received_at` (DateTime)
-- `processed_at` (DateTime, optional)
-- `error_message` (Text, optional)
-
-**RecoveryCase**: Represents a recovery case for failed payments
-- `id` (UUID, PK)
-- `payment_id` (UUID, FK)
-- `status` (Enum: OPEN, RESOLVED, CLOSED)
-- `amount_at_risk_minor` (Integer)
-
-**AuditEvent**: Audit trail for all important state changes
-- `id` (UUID, PK)
-- `entity_type` (String)
-- `entity_id` (UUID)
-- `event_type` (Enum: WEBHOOK_RECEIVED, PAYMENT_CREATED, PAYMENT_STATUS_CHANGED, RECOVERY_CASE_CREATED, etc.)
-- `actor_type` (Enum: SYSTEM, WEBHOOK, AGENT, USER)
-- `audit_metadata` (JSONB)
-
-**RevenueIntelligenceResult** (Phase 2): Persistent intelligence result for payments/recovery cases
-- `id` (UUID, PK)
-- `payment_id` (UUID, FK, unique)
-- `recovery_case_id` (UUID, FK, optional)
-- `failure_category` (Enum: PAYMENT_METHOD_FAILURE, INSUFFICIENT_FUNDS, BANK_FAILURE, NETWORK_FAILURE, AUTHENTICATION_FAILURE, LIMIT_EXCEEDED, TEMPORARY_FAILURE, UNKNOWN)
-- `failure_reason` (String)
-- `revenue_at_risk` (Integer)
-- `recovery_probability` (Float)
-- `estimated_recoverable_revenue` (Integer)
-- `opportunity_score` (Float)
-- `priority` (Enum: LOW, MEDIUM, HIGH, CRITICAL)
-- `recommended_intervention` (String)
-- `intervention_reason` (String)
-- `confidence` (Float)
-- `explanation` (String)
-- `factors` (JSONB)
-- `model_version` (String, default: "rules-v1")
-
-## Webhook Setup
-
-### Razorpay Test Mode Configuration
-
-1. Log into Razorpay Dashboard (Test Mode)
-2. Navigate to Settings → Webhooks
-3. Add a new webhook:
-   - **Webhook URL**: Your publicly accessible URL (e.g., from ngrok: `https://your-url.ngrok.io/api/v1/webhooks/razorpay`)
-   - **Secret**: Copy the webhook secret to your `.env` file as `RAZORPAY_WEBHOOK_SECRET`
-4. Select events to subscribe:
-   - `payment.failed`
-   - `payment.authorized`
-   - `payment.captured`
-
-### Local Webhook Testing
-
-For local development, use a tunnel service like ngrok:
-
-1. Install ngrok:
-```bash
-# On macOS
-brew install ngrok
-
-# On Windows
-# Download from https://ngrok.com/download
-```
-
-2. Start ngrok:
-```bash
-ngrok http 8000
-```
-
-3. Use the ngrok HTTPS URL in Razorpay webhook configuration
-
-4. Test webhooks using Razorpay Dashboard test events or API
-
-### Webhook Security
-
-**Signature Verification**: All webhooks are verified using HMAC-SHA256 with the raw request body (not re-serialized JSON) to prevent tampering.
-
-**Idempotency**: We use the `x-razorpay-event-id` header with a unique constraint to ensure duplicate webhook delivery creates no duplicate domain objects.
-
-**Raw Body Preservation**: We read the raw bytes before JSON parsing to ensure signature validation works correctly.
-
-## API Endpoints
-
-### Health Check
-```http
-GET /api/v1/health
-```
-Response:
-```json
-{
-  "status": "ok"
-}
-```
-
-### Razorpay Webhook
-```http
-POST /api/v1/webhooks/razorpay
-```
-Headers:
-- `x-razorpay-signature`: HMAC signature
-- `x-razorpay-event-id`: Unique event ID
-
-Response:
-```json
-{
-  "status": "received",
-  "message": "Webhook received and queued"
-}
-```
-
-### List Webhook Events
-```http
-GET /api/v1/webhooks/events
-```
-Query Parameters:
-- `event_type` (optional): Filter by event type
-- `processing_status` (optional): Filter by processing status
-- `from` (optional): Filter from date
-- `to` (optional): Filter to date
-- `page` (default: 1): Page number
-- `page_size` (default: 20, max: 100): Page size
-
-Response:
-```json
-{
-  "events": [...],
-  "total": 100,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-### Get Webhook Event
-```http
-GET /api/v1/webhooks/events/{event_id}
-```
-
-### List Payments
-```http
-GET /api/v1/payments
-```
-Query Parameters:
-- `status` (optional): Filter by payment status
-- `page` (default: 1): Page number
-- `page_size` (default: 20, max: 100): Page size
-
-Response:
-```json
-{
-  "payments": [...],
-  "total": 50,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-### Get Payment
-```http
-GET /api/v1/payments/{payment_id}
-```
-Response includes payment, attempts, and recovery case:
-```json
-{
-  "id": "...",
-  "razorpay_payment_id": "pay_123",
-  "status": "FAILED",
-  "amount_minor": 1000,
-  "attempts": [...],
-  "recovery_case": {...}
-}
-```
-
-### List Recovery Cases
-```http
-GET /api/v1/recovery/cases
-```
-Query Parameters:
-- `status` (optional): Filter by recovery case status (OPEN, RESOLVED, CLOSED)
-- `page` (default: 1): Page number
-- `page_size` (default: 20, max: 100): Page size
-
-Response:
-```json
-{
-  "cases": [...],
-  "total": 25,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-### Get Recovery Case
-```http
-GET /api/v1/recovery/cases/{case_id}
-```
-
-## Phase 2 Intelligence API Endpoints
-
-### Intelligence Overview
-```http
-GET /api/v1/intelligence/overview
-```
-Response:
-```json
-{
-  "total_revenue": 1000000,
-  "failed_revenue": 150000,
-  "revenue_at_risk": 150000,
-  "estimated_recoverable_revenue": 90000,
-  "recovered_revenue": 0,
-  "recovery_opportunity_count": 10,
-  "high_priority_opportunities": 3,
-  "failure_distribution": {},
-  "top_failure_reasons": [],
-  "priority_distribution": {}
-}
-```
-
-### List Recovery Opportunities
-```http
-GET /api/v1/intelligence/opportunities
-```
-Query Parameters:
-- `priority` (optional): Filter by priority (LOW, MEDIUM, HIGH, CRITICAL)
-- `failure_category` (optional): Filter by failure category
-- `page` (default: 1): Page number
-- `page_size` (default: 20, max: 100): Page size
-
-Response:
-```json
-{
-  "opportunities": [...],
-  "total": 10,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-### Get Opportunity Details
-```http
-GET /api/v1/intelligence/opportunities/{result_id}
-```
-Response includes complete intelligence reasoning with factors.
-
-### Analyze Payment
-```http
-POST /api/v1/intelligence/analyze/{payment_id}
-```
-Query Parameters:
-- `force_reanalyze` (optional, default: false): Force re-analysis even if result exists
-
-**Important**: This endpoint only generates intelligence/recommendations. It does NOT execute any payment actions.
-
-### Batch Analyze
-```http
-POST /api/v1/intelligence/analyze
-```
-Request body:
-```json
-{
-  "payment_ids": ["uuid1", "uuid2"],
-  "recovery_case_ids": ["uuid3"],
-  "force_reanalyze": false
-}
-```
-
-## Phase 2 Intelligence Methodology
-
-### Failure Classification
-
-The system normalizes raw payment failures into these categories:
-- **PAYMENT_METHOD_FAILURE**: Payment method processing error
-- **INSUFFICIENT_FUNDS**: Insufficient funds in customer account
-- **BANK_FAILURE**: Bank processing error
-- **NETWORK_FAILURE**: Network connectivity issue
-- **AUTHENTICATION_FAILURE**: Authentication or authorization failed
-- **LIMIT_EXCEEDED**: Transaction limit exceeded
-- **TEMPORARY_FAILURE**: Temporary system failure
-- **UNKNOWN**: Unknown failure reason
-
-Classification is deterministic based on:
-- Razorpay error codes
-- Failure message patterns
-- Payment method context
-
-### Revenue at Risk Calculation
-
-**Gross Failed Revenue**: Sum of all failed payment amounts
-
-**Potentially Recoverable Revenue**: Based on failure category recoverability:
-- TEMPORARY_FAILURE: 85%
-- NETWORK_FAILURE: 75%
-- INSUFFICIENT_FUNDS: 60%
-- AUTHENTICATION_FAILURE: 70%
-- PAYMENT_METHOD_FAILURE: 65%
-- BANK_FAILURE: 50%
-- LIMIT_EXCEEDED: 40%
-- UNKNOWN: 30%
-
-**Estimated Recoverable Revenue**: `payment_amount × recovery_probability`
-
-### Recovery Probability
-
-Calculated using deterministic factors:
-- Base probability from failure category
-- Retry count adjustment (fewer retries = higher probability)
-- Time since failure (fresh failures = higher probability)
-- Merchant-relative transaction value (higher relative value may get more recovery effort)
-- Merchant historical recovery rate
-- Previous recovery attempts
-- Payment method
-
-Probability is bounded between 0.0 and 1.0.
-
-**Note**: This is a rules-based estimate (estimated_recovery_likelihood), not a statistically trained probability. Historical recovery labels are unavailable in the demo dataset. The model version is "rules-v1".
-
-### Opportunity Scoring
-
-**Opportunity Value**: Uses merchant-relative transaction value, not absolute amounts.
-
-**Score Components**:
-- Merchant-relative normalized value (0-40 points)
-- Recovery likelihood component (0-40 points)
-- Transaction value percentile bonus (0-10 points)
-- Time sensitivity bonus/penalty (±10 points)
-- Retry count adjustment (±15 points)
-
-**Priority Levels**:
-- **CRITICAL**: Score ≥ 80 OR top 10% merchant-relative value with recovery likelihood > 0.6
-- **HIGH**: Score ≥ 60
-- **MEDIUM**: Score ≥ 40
-- **LOW**: Score < 40
-
-**Important**: RecoverX does not use absolute transaction thresholds for merchant opportunity prioritization because transaction value is contextual. The same amount can be material for one merchant and insignificant for another. All scoring uses merchant-relative transaction value percentiles and normalized scores.
-
-### Intervention Recommendations
-
-Deterministic rules-based recommendations:
-- **TEMPORARY_FAILURE** → RETRY_PAYMENT
-- **NETWORK_FAILURE** → RETRY_LATER
-- **INSUFFICIENT_FUNDS** → REQUEST_ALTERNATE_PAYMENT_METHOD
-- **AUTHENTICATION_FAILURE** → REQUEST_REAUTHENTICATION
-- **BANK_FAILURE** → RETRY_WITH_ALTERNATE_METHOD
-- **LIMIT_EXCEEDED** → REQUEST_MANUAL_REVIEW
-- **UNKNOWN** → MANUAL_REVIEW
-
-Adjustments based on:
-- Priority level
-- Retry count
-- Recovery probability
-- Time since failure
-
-## Frontend Dashboard
-
-### Accessing the Dashboard
-
-Open `frontend/index.html` in a web browser after starting the backend.
-
-### Dashboard Features
-
-**Top-level Cards**:
-- Revenue at Risk
-- Estimated Recoverable
-- Failed Revenue
-- High Priority Opportunities
-
-**Revenue Risk Overview**:
-- Visual bar showing revenue distribution
-- Breakdown by risk category
-
-**Failure Analysis**:
-- Failure distribution by category
-- Top failure reasons
-- Priority distribution
-
-**Recovery Opportunities Table**:
-- Filterable by priority and failure category
-- Shows payment amount, failure, recovery probability, opportunity score, priority, recommended action
-- Click "View" for detailed analysis
-
-**Opportunity Detail View**:
-- Complete payment information
-- Failure analysis with category and reason
-- Revenue intelligence metrics
-- Opportunity scoring with priority
-- Recommended intervention with confidence
-- Deterministic reasoning with contributing factors
-- Analysis metadata (model version, timestamp)
-
-## Demo Scenarios
-
-The demo data script creates these scenarios:
-
-1. **High-value temporary failure (₹25,000)**: HIGH priority, good recovery probability
-2. **Low-value insufficient funds (₹500)**: LOW priority, multiple retries
-3. **High-value authentication failure (₹50,000)**: MEDIUM priority
-4. **Multiple network failures**: Demonstrates failure category aggregation
-5. **Successful payments**: Provides context for revenue metrics
-
-## Testing
-
-### Run All Tests
-```bash
-cd backend
-pytest
-```
-
-### Run Specific Test File
-```bash
-pytest tests/test_signature_verification.py
-pytest tests/test_intelligence_components.py
-pytest tests/test_intelligence_integration.py
-```
-
-### Run with Coverage
-```bash
-pytest --cov=app --cov-report=html
-```
-
-### Test Categories
-
-**Signature Verification Tests** (`tests/test_signature_verification.py`):
-- Valid signature acceptance
-- Invalid signature rejection
-- Modified payload rejection
-
-**Idempotency Tests** (`tests/test_idempotency.py`):
-- Duplicate event detection
-- No duplicate for new events
-- Duplicate events not processed again
-
-**State Transition Tests** (`tests/test_state_transitions.py`):
-- Valid transitions (CREATED → AUTHORIZED, AUTHORIZED → CAPTURED, etc.)
-- Out-of-order support (FAILED → CAPTURED)
-- Invalid transitions (CAPTURED → any)
-
-**Webhook Processing Tests** (`tests/test_webhook_processing.py`):
-- payment.failed creates recovery case
-- Unknown event types ignored
-- Invalid signature rejected
-
-**Intelligence Component Tests** (`tests/test_intelligence_components.py`):
-- Failure classification for various error types
-- Revenue at risk calculation
-- Recovery probability with different factors
-- Opportunity scoring and priority assignment
-- Intervention recommendations
-
-**Intelligence Integration Tests** (`tests/test_intelligence_integration.py`):
-- End-to-end payment analysis
-- Intelligence result persistence
-- API endpoint integration
-- Batch analysis functionality
-
-## Event Flow
-
-### payment.failed
-```
-WebhookEvent → Find/create Payment → Create PaymentAttempt → 
-Update Payment status = FAILED → Create RecoveryCase → AuditEvent
-```
-
-### payment.authorized
-```
-WebhookEvent → Find Payment → Update status = AUTHORIZED → AuditEvent
-```
-
-### payment.captured
-```
-WebhookEvent → Find Payment → Update status = CAPTURED → 
-Resolve any active recovery case → AuditEvent
-```
-
-## Project Structure
-
-```
-recoverx/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                 # FastAPI application
-│   │   ├── core/
-│   │   │   ├── config.py           # Configuration management
-│   │   │   ├── security.py         # Security utilities
-│   │   │   └── logging.py          # Logging configuration
-│   │   ├── db/
-│   │   │   ├── base.py             # Base model and enums
-│   │   │   ├── session.py          # Database session management
-│   │   │   └── models/             # SQLAlchemy models
-│   │   ├── modules/
-│   │   │   ├── webhooks/           # Webhook handling
-│   │   │   ├── payments/           # Payment management
-│   │   │   └── recovery/           # Recovery case management
-│   │   ├── intelligence/           # Phase 2: Revenue Intelligence
-│   │   │   ├── schemas.py          # Pydantic schemas
-│   │   │   ├── feature_extractor.py
-│   │   │   ├── failure_classifier.py
-│   │   │   ├── revenue_calculator.py
-│   │   │   ├── probability_engine.py
-│   │   │   ├── opportunity_scorer.py
-│   │   │   ├── intervention_engine.py
-│   │   │   ├── intelligence_service.py
-│   │   │   └── router.py           # API endpoints
-│   │   ├── workers/
-│   │   │   └── webhook_worker.py  # Background webhook processor
-│   │   └── utils/
-│   │       └── audit.py            # Audit service
-│   ├── alembic/                    # Database migrations
-│   ├── tests/
-│   │   ├── fixtures/               # Test data fixtures
-│   │   ├── test_signature_verification.py
-│   │   ├── test_idempotency.py
-│   │   ├── test_state_transitions.py
-│   │   ├── test_webhook_processing.py
-│   │   ├── test_intelligence_components.py
-│   │   └── test_intelligence_integration.py
-│   ├── scripts/
-│   │   ├── seed_data.py            # Development data seeding
-│   │   └── seed_demo_data.py       # Phase 2 demo data
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── alembic.ini
-├── frontend/
-│   ├── index.html                  # Revenue Intelligence Dashboard
-│   ├── styles.css                  # Dashboard styles
-│   └── app.js                      # Dashboard JavaScript
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
-
-## Observability
-
-The system tracks the following metrics for future dashboard integration:
-- `webhooks_received`
-- `webhooks_processed`
-- `webhooks_failed`
-- `duplicate_webhooks`
-- `payment_failures`
-- `payment_captures`
-- `recovery_cases_created`
-- `intelligence_analysis_complete` (Phase 2)
-- `intelligence_result_exists` (Phase 2)
-
-## Known Limitations
-
-1. **Single Merchant**: Phase 1 uses a single development merchant, but the schema supports multiple merchants.
-2. **Basic Recovery Logic**: Recovery cases are created for all failed payments without sophisticated recoverability scoring (Phase 2).
-3. **No AI Components**: Phase 1 focuses on the financial foundation only; AI agent, ML models, and recovery strategies are not implemented.
-4. **Local Testing**: Webhook testing requires tunnel services like ngrok for local development.
-5. **Deterministic Scoring (Phase 2)**: Phase 2 uses deterministic rules-based scoring. Actual historical recovery probability is not available in the demo dataset. The system uses merchant-relative transaction values instead of absolute thresholds to ensure contextual prioritization.
-6. **No Action Execution (Phase 2)**: Phase 2 produces intelligence and recommendations only. It does NOT execute payment actions, refunds, retries, or customer messages.
-7. **Demo Dataset Limitations**: The demo dataset may not contain enough historical transactions to calculate meaningful percentiles for all merchants. In such cases, the system uses safe deterministic fallbacks (neutral 0.5 values).
-
-## Next Steps for Phase 3
-
-Phase 3 will build on this foundation to add:
-- AI reasoning engine using LLM for natural-language explanations
-- Adaptive recovery strategies based on historical performance
-- Bounded action execution (retries, customer communications)
-- Agent observability and reasoning transparency
-- Production polish and optimization
+### Scenario Evaluation Coverage:
+1. **Scenario 1 (Temporary Failure)**: High-value temporary bank outage with 0 retries → Agent selects `WAIT_AND_RETRY` → PolicyEngine: `ALLOWED`.
+2. **Scenario 2 (Insufficient Funds)**: Balance failure → Agent selects `REQUEST_ALTERNATE_PAYMENT_METHOD` → PolicyEngine: `ALLOWED`.
+3. **Scenario 3 (Repeated Failures)**: 3 previous failed attempts → Retry limit reached → Agent/PolicyEngine routes to `MANUAL_REVIEW`.
+4. **Scenario 4 (Low-Value Opportunity)**: ₹300 transaction → Low operational urgency → Conservative `SEND_PAYMENT_REMINDER`.
+5. **Scenario 5 (Policy Block)**: Agent retry proposal when retry count exceeds max limit → PolicyEngine returns `BLOCKED` and safely falls back to `MANUAL_REVIEW`.
+
+---
+
+## 🔒 Security & Guardrails
+
+| Guardrail | Implementation |
+|---|---|
+| **Financial Authority Isolation** | LLMs cannot modify database rows, execute retries, issue refunds, or trigger payments. |
+| **Tool Read-Only Boundary** | Tools are strictly whitelisted and query-only (`ToolRegistry`). |
+| **Deterministic Policy Authority** | The `PolicyEngine` deterministically validates every proposed plan. It cannot be bypassed by prompt manipulation. |
+| **Prompt-Injection Sanitization** | Delimited boundaries and regex pattern stripping in `PlanValidator` and `build_recovery_prompt`. |
+| **Cross-Merchant Tenant Isolation** | Queries and agent runs require merchant scope matching. |
+| **Audit Trail** | All state transitions, webhook receipts, and agent tool executions are permanently recorded in `audit_events` and `agent_tool_calls`. |
+
+---
+
+## ⚠️ Phase 4 Action Execution Boundary
+
+In accordance with enterprise safety standards:
+- **Phase 3 strictly outputs a structured plan (`RecoveryPlan`).**
+- **Action execution is completely disabled in Phase 3.**
+- Phase 4 will introduce controlled webhook dispatchers, payment gateway retry execution, and customer communication channels with explicit human-in-the-loop approval gates.

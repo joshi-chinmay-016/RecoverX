@@ -1,7 +1,8 @@
 """Pydantic schemas for Revenue Intelligence."""
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
+from uuid import UUID
 from datetime import datetime
 from enum import Enum
 
@@ -75,13 +76,7 @@ class RevenueAtRisk(BaseModel):
 
 
 class RecoveryProbability(BaseModel):
-    """Estimated recovery likelihood with contributing factors.
-    
-    Note: This is a rules-based estimate, not a statistically trained probability.
-    Historical recovery labels are unavailable in the demo dataset.
-    The field is named 'probability' for API compatibility but represents
-    estimated_recovery_likelihood based on deterministic rules.
-    """
+    """Estimated recovery likelihood with contributing factors."""
     probability: float = Field(ge=0.0, le=1.0, description="Estimated recovery likelihood (0.0 to 1.0)")
     factors: List[Dict[str, Any]] = []
 
@@ -103,9 +98,9 @@ class InterventionRecommendation(BaseModel):
 
 class IntelligenceResult(BaseModel):
     """Complete intelligence result for a payment/recovery case."""
-    id: str
-    payment_id: str
-    recovery_case_id: Optional[str] = None
+    id: Union[UUID, str]
+    payment_id: Union[UUID, str]
+    recovery_case_id: Optional[Union[UUID, str]] = None
     
     # Classification
     failure_category: FailureCategory

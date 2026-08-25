@@ -1,7 +1,7 @@
 """Revenue Intelligence database model."""
 
-from sqlalchemy import Column, Integer, ForeignKey, String, Float, Enum as SQLEnum, JSONB
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Integer, ForeignKey, String, Float, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.db.base import Base, TimestampMixin
 from app.intelligence.schemas import FailureCategory, PriorityLevel

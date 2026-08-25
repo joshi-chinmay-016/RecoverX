@@ -47,6 +47,22 @@ class ActorType(str, enum.Enum):
     USER = "USER"
 
 
+class AgentRunStatus(str, enum.Enum):
+    CREATED = "CREATED"
+    INVESTIGATING = "INVESTIGATING"
+    PLANNING = "PLANNING"
+    VALIDATING = "VALIDATING"
+    COMPLETED = "COMPLETED"
+    BLOCKED = "BLOCKED"
+    FAILED = "FAILED"
+
+
+class PolicyStatus(str, enum.Enum):
+    ALLOWED = "ALLOWED"
+    BLOCKED = "BLOCKED"
+    REQUIRES_APPROVAL = "REQUIRES_APPROVAL"
+
+
 class TimestampMixin:
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
