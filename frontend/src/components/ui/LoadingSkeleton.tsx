@@ -29,3 +29,22 @@ export const TableSkeleton: React.FC<{ rows?: number }> = ({ rows = 5 }) => (
     ))}
   </div>
 );
+
+export const LoadingSkeleton: React.FC<{ count?: number }> = ({ count = 3 }) => (
+  <div className="space-y-4">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="p-6 rounded-2xl bg-surface-card border border-border animate-pulse space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+

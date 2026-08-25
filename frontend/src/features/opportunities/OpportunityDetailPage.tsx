@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getOpportunity } from '@/api/opportunities';
 import { getPayment } from '@/api/payments';
+import { listActions } from '@/api/actions';
+import { ActionExecutionCard } from '@/components/execution/ActionExecutionCard';
 import { PriorityBadge } from '@/components/ui/PriorityBadge';
 import { ScoreRing } from '@/components/ui/ScoreRing';
 import { ProbabilityBar } from '@/components/ui/ProbabilityBar';
@@ -19,6 +21,7 @@ import {
   History,
   CheckCircle2,
   TrendingUp,
+  Zap,
 } from 'lucide-react';
 
 export const OpportunityDetailPage: React.FC = () => {
@@ -43,89 +46,156 @@ export const OpportunityDetailPage: React.FC = () => {
     enabled: Boolean(opportunity?.payment_id),
   });
 
+  const { data: actionsData, refetch: refetchActions } = useQuery({
+    queryKey: ['actions-for-opportunity', id],
+    queryFn: () => listActions({ opportunity_id: id }),
+    enabled: Boolean(id),
+  });
+
   if (isOppLoading) {
     return (
-      <div className="space-y-6">
-        <MetricCardSkeleton />
-        <MetricCardSkeleton />
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-surface-card rounded-xl w-48" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+        </div>
       </div>
     );
   }
 
   if (isOppError || !opportunity) {
     return (
-      <div className="space-y-4">
-        <button
-          onClick={() => navigate('/opportunities')}
-          className="text-xs text-gray-400 hover:text-white flex items-center gap-1 cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Opportunities
-        </button>
-        <ErrorState
-          title="Opportunity Not Found"
-          message={oppError instanceof Error ? oppError.message : 'Unable to find opportunity result in backend'}
-          onRetry={refetch}
-        />
-      </div>
+      <ErrorState
+        title="Opportunity Not Found"
+        message={oppError instanceof Error ? oppError.message : 'Could not retrieve opportunity intelligence data.'}
+        onRetry={() => refetch()}
+      />
     );
   }
 
+  const existingActions = actionsData?.items || [];
+
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Back Button & Top Bar */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/opportunities')}
-          className="text-xs font-semibold text-gray-400 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Opportunities Queue
-        </button>
+      {/* Navigation & Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/opportunities')}
+            className="p-2.5 rounded-xl bg-surface-card hover:bg-white/5 border border-border text-gray-300 hover:text-white transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-heading font-extrabold text-xl sm:text-2xl text-white">
+                Opportunity: {opportunity.payment_id}
+              </h2>
+              <PriorityBadge priority={opportunity.priority} />
+            </div>
+            <span className="text-xs text-gray-400 font-mono">
+              Evaluated {formatDate(opportunity.created_at)}
+            </span>
+          </div>
+        </div>
 
+        {/* CTA: Launch Agent Studio */}
         <button
           onClick={() => navigate(`/agent?opportunityId=${opportunity.id}`)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white font-heading font-extrabold text-xs shadow-lg shadow-indigo-500/25 active:scale-95 transition-all cursor-pointer w-full sm:w-auto"
         >
           <Bot className="w-4 h-4" />
           <span>Launch AI Recovery Agent</span>
         </button>
       </div>
 
-      {/* Hero Diagnostic Card */}
-      <div className="p-6 rounded-2xl bg-surface-card border border-border flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-indigo-500 before:via-pink-500 before:to-emerald-500">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] font-mono uppercase font-bold text-indigo-400 bg-indigo-500/15 px-2 py-0.5 rounded border border-indigo-500/30">
-              Recovery Opportunity
+      {/* Hero Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Revenue at Risk */}
+        <div className="p-5 rounded-2xl bg-surface-card border border-border flex items-center justify-between">
+          <div>
+            <span className="text-xs font-mono uppercase text-gray-400 font-semibold block">Revenue at Risk</span>
+            <span className="font-heading font-extrabold text-2xl text-rose-400 mt-1 block">
+              {formatCurrency(opportunity.revenue_at_risk)}
             </span>
-            <PriorityBadge priority={opportunity.priority} />
+            <span className="text-[11px] text-gray-400 font-mono mt-0.5 block">PAISE: {opportunity.revenue_at_risk}</span>
           </div>
-          <h2 className="font-heading font-extrabold text-3xl sm:text-4xl text-white tracking-tight">
-            {formatCurrency(opportunity.revenue_at_risk)}
-          </h2>
-          <p className="text-xs sm:text-sm text-gray-400 mt-1 flex items-center gap-2">
-            <span>Root Cause:</span>
-            <strong className="text-gray-200">{formatEnum(opportunity.failure_category)}</strong>
-          </p>
+          <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center">
+            <AlertCircle className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="flex items-center gap-8 border-t md:border-t-0 md:border-l border-border pt-4 md:pt-0 md:pl-8">
-          <div className="text-center">
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-              Recovery Likelihood
-            </div>
-            <div className="font-heading font-bold text-2xl text-emerald-400">
-              {Math.round(opportunity.recovery_probability * 100)}%
+        {/* Recovery Likelihood */}
+        <div className="p-5 rounded-2xl bg-surface-card border border-border flex flex-col justify-between">
+          <span className="text-xs font-mono uppercase text-gray-400 font-semibold block">Recovery Likelihood</span>
+          <div className="mt-2">
+            <ProbabilityBar probability={opportunity.recovery_likelihood} showLabel={false} />
+            <div className="flex justify-between items-center text-xs font-mono mt-1 text-gray-300">
+              <span>Likelihood:</span>
+              <strong className="text-emerald-400">{Math.round(opportunity.recovery_likelihood * 100)}%</strong>
             </div>
           </div>
+        </div>
 
-          <div className="text-center">
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-              Opportunity Score
-            </div>
-            <ScoreRing score={opportunity.opportunity_score} size={54} strokeWidth={5} />
+        {/* Opportunity Score */}
+        <div className="p-5 rounded-2xl bg-surface-card border border-border flex items-center justify-between">
+          <div>
+            <span className="text-xs font-mono uppercase text-gray-400 font-semibold block">Opportunity Score</span>
+            <span className="font-heading font-extrabold text-2xl text-white mt-1 block">
+              {opportunity.opportunity_score}/100
+            </span>
+            <span className="text-[11px] text-indigo-300 font-mono mt-0.5 block">Merchant Normalized</span>
+          </div>
+          <ScoreRing score={opportunity.opportunity_score} size={50} />
+        </div>
+
+        {/* Failure Category */}
+        <div className="p-5 rounded-2xl bg-surface-card border border-border flex items-center justify-between">
+          <div>
+            <span className="text-xs font-mono uppercase text-gray-400 font-semibold block">Classified Root Cause</span>
+            <span className="font-heading font-bold text-base text-indigo-300 mt-1 block truncate max-w-[140px]">
+              {formatEnum(opportunity.failure_category)}
+            </span>
+            <span className="text-[11px] text-gray-400 font-mono mt-0.5 block">
+              Confidence: {Math.round((opportunity.category_confidence || 0.9) * 100)}%
+            </span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+            <Cpu className="w-5 h-5" />
           </div>
         </div>
       </div>
+
+      {/* Controlled Execution Actions Section (Phase 4) */}
+      {existingActions.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-heading font-bold text-base text-white flex items-center gap-2">
+              <Zap className="w-4 h-4 text-pink-400" />
+              Controlled Recovery Actions
+            </h3>
+            <span className="text-xs font-mono text-gray-400">
+              {existingActions.length} Actions Linked
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {existingActions.map((act) => (
+              <ActionExecutionCard
+                key={act.id}
+                action={act}
+                onUpdated={() => {
+                  refetch();
+                  refetchActions();
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Grid: Context & Contributing Factors */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -143,7 +213,7 @@ export const OpportunityDetailPage: React.FC = () => {
             </div>
             <div className="py-2.5 flex justify-between">
               <span className="text-gray-400">Status:</span>
-              <span className="font-semibold text-rose-400">FAILED</span>
+              <span className="font-semibold text-rose-400">{payment?.status || 'FAILED'}</span>
             </div>
             <div className="py-2.5 flex justify-between">
               <span className="text-gray-400">Gateway Error Reason:</span>

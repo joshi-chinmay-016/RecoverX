@@ -21,7 +21,10 @@ from app.db.models.payment import Payment
 from app.db.models.payment_attempt import PaymentAttempt
 from app.db.models.recovery_case import RecoveryCase
 from app.db.models.revenue_intelligence import RevenueIntelligenceResult
-from app.db.base import PaymentStatus, RecoveryCaseStatus
+from app.db.base import PaymentStatus, RecoveryCaseStatus, ActionStatus, ExecutionAttemptStatus
+from app.db.models.recovery_action import RecoveryAction
+from app.db.models.execution_attempt import ExecutionAttempt
+from app.agent.schemas import ActionType
 from app.intelligence.schemas import PriorityLevel, FailureCategory
 import uuid
 
@@ -332,12 +335,72 @@ def seed_scenario_5_policy_block(db: Session, merchant: Merchant, customer: Cust
     return intelligence
 
 
+def seed_recovery_action(
+    db: Session,
+    merchant_id: str,
+    opportunity: RevenueIntelligenceResult,
+    action_type: ActionType,
+    status: ActionStatus,
+    idempotency_key: str,
+    provider_reference: str = None,
+    error_code: str = None,
+) -> RecoveryAction:
+    """Create a sample recovery action."""
+    action = RecoveryAction(
+        action_id=f"ACT-{uuid.uuid4().hex[:8].upper()}",
+        opportunity_id=opportunity.id,
+        payment_id=opportunity.payment_id,
+        merchant_id=merchant_id,
+        action_type=action_type,
+        status=status,
+        parameters={"delay_minutes": 0},
+        policy_decision={
+            "decision": "ALLOWED" if status in [ActionStatus.AUTHORIZED, ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN] else "BLOCKED",
+            "reasons": ["All deterministic financial and safety policy checks passed."] if status != ActionStatus.BLOCKED else ["Exceeded maximum allowed retry attempts (3/3)."],
+            "applicable_rules": ["payment_status_eligibility", "max_retry_limit_rule", "merchant_isolation_rule"],
+            "policy_version": "policy-v1",
+        },
+        idempotency_key=idempotency_key,
+        execution_attempts_count=1 if status in [ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN, ActionStatus.FAILED] else 0,
+        max_attempts=3,
+        provider_reference=provider_reference,
+        last_error_code=error_code,
+        policy_version="policy-v1",
+        execution_version="execution-v1",
+        requested_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+        authorized_at=datetime.now(timezone.utc) - timedelta(minutes=25) if status != ActionStatus.PROPOSED else None,
+        started_at=datetime.now(timezone.utc) - timedelta(minutes=20) if status in [ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN, ActionStatus.FAILED] else None,
+        completed_at=datetime.now(timezone.utc) - timedelta(minutes=19) if status in [ActionStatus.SUCCEEDED, ActionStatus.FAILED] else None,
+    )
+    db.add(action)
+    db.commit()
+    db.refresh(action)
+
+    if status in [ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN, ActionStatus.FAILED]:
+        attempt = ExecutionAttempt(
+            action_id=action.id,
+            attempt_number=1,
+            idempotency_key=f"{idempotency_key}_att1",
+            adapter_name="MockPaymentAdapter",
+            status=ExecutionAttemptStatus.SUCCESS if status == ActionStatus.SUCCEEDED else ExecutionAttemptStatus.UNKNOWN if status == ActionStatus.UNKNOWN else ExecutionAttemptStatus.FAILURE,
+            provider_reference=provider_reference,
+            error_code=error_code,
+            execution_latency_ms=320,
+            started_at=datetime.now(timezone.utc) - timedelta(minutes=20),
+            completed_at=datetime.now(timezone.utc) - timedelta(minutes=19),
+        )
+        db.add(attempt)
+        db.commit()
+
+    return action
+
+
 def main():
-    """Seed demo scenarios for Phase 3 Agent."""
+    """Seed demo scenarios for Phase 3 Agent and Phase 4 Execution."""
     db = SessionLocal()
     
     try:
-        print("Seeding Phase 3 Agent Demo Scenarios...")
+        print("Seeding RecoverX Benchmark Demo Scenarios (Phase 1-4)...")
         
         merchant = create_merchant(db, "Demo Merchant Agent", "demo_merchant_agent")
         customer = create_customer(db, "demo@recoverx.ai")
@@ -348,12 +411,27 @@ def main():
         scenario4 = seed_scenario_4_low_value(db, merchant, customer)
         scenario5 = seed_scenario_5_policy_block(db, merchant, customer)
         
-        print("\n✅ Demo scenarios seeded successfully!")
-        print(f"  Scenario 1 (Transient Bank Failure): {scenario1.id}")
+        # Seed Phase 4 Actions
+        print("\nSeeding Phase 4 Recovery Actions & Execution Records...")
+        act1 = seed_recovery_action(
+            db, merchant.id, scenario1, ActionType.RETRY_PAYMENT, ActionStatus.AUTHORIZED,
+            f"idem_demo_{uuid.uuid4().hex[:8]}"
+        )
+        act3 = seed_recovery_action(
+            db, merchant.id, scenario3, ActionType.MANUAL_REVIEW, ActionStatus.REQUIRES_APPROVAL,
+            f"idem_demo_{uuid.uuid4().hex[:8]}"
+        )
+        act5 = seed_recovery_action(
+            db, merchant.id, scenario5, ActionType.RETRY_PAYMENT, ActionStatus.BLOCKED,
+            f"idem_demo_{uuid.uuid4().hex[:8]}", error_code="RETRY_LIMIT_EXCEEDED"
+        )
+
+        print("\n✅ All demo scenarios & Phase 4 actions seeded successfully!")
+        print(f"  Scenario 1 (Transient Bank Failure): {scenario1.id} -> Action: {act1.action_id} (AUTHORIZED)")
         print(f"  Scenario 2 (Insufficient Funds): {scenario2.id}")
-        print(f"  Scenario 3 (Repeated Failure): {scenario3.id}")
+        print(f"  Scenario 3 (Repeated Failure): {scenario3.id} -> Action: {act3.action_id} (REQUIRES_APPROVAL)")
         print(f"  Scenario 4 (Low-Value): {scenario4.id}")
-        print(f"  Scenario 5 (Policy Block): {scenario5.id}")
+        print(f"  Scenario 5 (Policy Block): {scenario5.id} -> Action: {act5.action_id} (BLOCKED)")
         
     except Exception as e:
         print(f"❌ Error seeding demo scenarios: {e}")

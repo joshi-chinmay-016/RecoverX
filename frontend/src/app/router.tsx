@@ -6,6 +6,7 @@ import { OpportunitiesPage } from '@/features/opportunities/OpportunitiesPage';
 import { OpportunityDetailPage } from '@/features/opportunities/OpportunityDetailPage';
 import { AgentStudioPage } from '@/features/agent/AgentStudioPage';
 import { AgentRunDetailPage } from '@/features/agent/AgentRunDetailPage';
+import { ActionsPage } from '@/features/actions/ActionsPage';
 import { PoliciesPage } from '@/features/policies/PoliciesPage';
 import { AuditPage } from '@/features/audit/AuditPage';
 
@@ -37,6 +38,10 @@ export const router = createBrowserRouter([
       {
         path: 'agent/runs/:id',
         element: <AgentRunDetailPage />,
+      },
+      {
+        path: 'actions',
+        element: <ActionsPage />,
       },
       {
         path: 'policies',

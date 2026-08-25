@@ -5,6 +5,7 @@ import {
   BrainCircuit,
   TrendingUp,
   Bot,
+  Zap,
   ShieldCheck,
   History,
   Shield,
@@ -40,6 +41,12 @@ export const Sidebar: React.FC = () => {
       path: '/agent',
       icon: <Bot className="w-4 h-4" />,
       badge: 'Active Studio',
+    },
+    {
+      label: 'Recovery Actions',
+      path: '/actions',
+      icon: <Zap className="w-4 h-4 text-pink-400" />,
+      badge: 'Execution',
     },
     {
       label: 'Policies & Safety',
@@ -110,7 +117,7 @@ export const Sidebar: React.FC = () => {
         <Shield className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
         <div>
           <span className="font-semibold block text-indigo-300">Policy Guardrails Active</span>
-          AI Agent synthesizes recovery plans with deterministic PolicyEngine safety checks.
+          Controlled execution layer active. Only authorized actions execute via MockPaymentAdapter.
         </div>
       </div>
     </aside>

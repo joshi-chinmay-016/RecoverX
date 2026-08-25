@@ -7,6 +7,8 @@ from app.db.models.recovery_case import RecoveryCase
 from app.db.models.audit_event import AuditEvent
 from app.db.models.revenue_intelligence import RevenueIntelligenceResult
 from app.db.models.agent_run import AgentRun, AgentToolCall
+from app.db.models.recovery_action import RecoveryAction
+from app.db.models.execution_attempt import ExecutionAttempt
 
 __all__ = [
     "Merchant",
@@ -19,4 +21,6 @@ __all__ = [
     "RevenueIntelligenceResult",
     "AgentRun",
     "AgentToolCall",
+    "RecoveryAction",
+    "ExecutionAttempt",
 ]

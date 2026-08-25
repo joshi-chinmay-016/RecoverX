@@ -8,6 +8,8 @@ import os
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from urllib.parse import urlparse
+from alembic.config import Config
+from alembic import command
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -24,7 +26,6 @@ def ensure_database():
 
     print(f"Connecting to PostgreSQL server at {host}:{port} as user '{user}'...")
     try:
-        # Connect to default 'postgres' maintenance database
         conn = psycopg2.connect(
             dbname='postgres',
             user=user,
@@ -35,7 +36,6 @@ def ensure_database():
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
 
-        # Check if target database exists
         cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
         exists = cursor.fetchone()
 
@@ -50,7 +50,16 @@ def ensure_database():
         conn.close()
     except Exception as e:
         print(f"Error ensuring database exists: {e}")
-        print("Continuing with migrations...")
+
+def run_migrations():
+    """Run all alembic migrations up to head."""
+    alembic_cfg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
+    cfg = Config(alembic_cfg_path)
+    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    print("Applying Alembic migrations...")
+    command.upgrade(cfg, "head")
+    print("✓ All migrations successfully applied.")
 
 if __name__ == '__main__':
     ensure_database()
+    run_migrations()
