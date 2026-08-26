@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 from sqlalchemy.orm import Session
 from app.db.models.payment import Payment
 from app.db.models.payment_attempt import PaymentAttempt
@@ -137,15 +137,16 @@ class PaymentService:
         
         return attempt
     
-    def get_payment(self, payment_id: str) -> Optional[Payment]:
-        """Get payment by ID with attempts."""
-        return self.repository.get_by_id(payment_id)
+    def get_payment(self, payment_id: str, merchant_id: Optional[Any] = None) -> Optional[Payment]:
+        """Get payment by ID with attempts, optionally scoped to tenant."""
+        return self.repository.get_by_id(payment_id, merchant_id=merchant_id)
     
     def list_payments(
         self,
         status: Optional[PaymentStatus] = None,
+        merchant_id: Optional[Any] = None,
         page: int = 1,
         page_size: int = 20
     ) -> tuple[list[Payment], int]:
-        """List payments with filters."""
-        return self.repository.list_payments(status, page, page_size)
+        """List payments with filters and tenant scoping."""
+        return self.repository.list_payments(status, merchant_id=merchant_id, page=page, page_size=page_size)

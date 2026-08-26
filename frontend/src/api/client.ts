@@ -1,8 +1,8 @@
 /**
- * RecoverX Centralized Typed API Client
+ * RecoverX Centralized Typed API Client with JWT & Multi-Tenant Support
  */
 
-export const BASE_URL = import.meta.env.VITE_API_BASE_URL 
+export const BASE_URL = import.meta.env?.VITE_API_BASE_URL 
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api/v1`
   : 'http://localhost:8000/api/v1';
 
@@ -26,8 +26,13 @@ export async function apiClient<T>(
     ? endpoint
     : `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+  const token = localStorage.getItem('recoverx_token');
+  const activeMerchantId = localStorage.getItem('recoverx_active_merchant_id');
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(activeMerchantId ? { 'X-Merchant-ID': activeMerchantId } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -48,6 +53,16 @@ export async function apiClient<T>(
       const errorMessage =
         (typeof errorData.detail === 'string' ? errorData.detail : errorData.message) ||
         `HTTP Request failed with status ${response.status}`;
+
+      // Handle 401 Unauthorized globally
+      if (response.status === 401 && !url.includes('/auth/login')) {
+        localStorage.removeItem('recoverx_token');
+        localStorage.removeItem('recoverx_user');
+        localStorage.removeItem('recoverx_active_merchant_id');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
 
       throw new ApiError(response.status, errorMessage, errorData);
     }

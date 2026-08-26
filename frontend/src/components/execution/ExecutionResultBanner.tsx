@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Shield, ArrowRight } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ExecutionResultResponse } from '@/types/action';
 import { formatCurrency } from '@/lib/formatters';
 

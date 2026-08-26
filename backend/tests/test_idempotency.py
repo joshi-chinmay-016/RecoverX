@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.modules.webhooks.service import WebhookService
@@ -17,6 +18,7 @@ class TestIdempotency:
         try:
             yield db
         finally:
+            db.rollback()
             db.close()
     
     @pytest.fixture
@@ -33,7 +35,7 @@ class TestIdempotency:
     
     def test_duplicate_event_detection(self, webhook_service):
         """Test that duplicate events are detected."""
-        provider_event_id = "evt_123"
+        provider_event_id = f"evt_{uuid.uuid4().hex[:8]}"
         
         # Create first event
         first_event = webhook_service.create_webhook_event(
@@ -52,7 +54,7 @@ class TestIdempotency:
     
     def test_no_duplicate_for_new_event(self, webhook_service):
         """Test that new events are not detected as duplicates."""
-        provider_event_id = "evt_123"
+        provider_event_id = f"evt_nonexistent_{uuid.uuid4().hex[:8]}"
         
         # Check for non-existent event
         duplicate = webhook_service.check_duplicate(provider_event_id)
@@ -61,7 +63,7 @@ class TestIdempotency:
     
     def test_duplicate_event_not_processed_again(self, webhook_service):
         """Test that duplicate events are not processed again."""
-        provider_event_id = "evt_123"
+        provider_event_id = f"evt_{uuid.uuid4().hex[:8]}"
         
         # Create first event
         first_event = webhook_service.create_webhook_event(

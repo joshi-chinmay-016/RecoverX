@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Zap, ShieldCheck, Filter, RefreshCw, Layers, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Zap, ShieldCheck, Filter, RefreshCw, Layers, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { listActions } from '@/api/actions';
 import { ActionExecutionCard } from '@/components/execution/ActionExecutionCard';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
@@ -32,7 +32,6 @@ export const ActionsPage: React.FC = () => {
   const total = data?.total || 0;
 
   const succeededCount = actions.filter((a) => a.status === 'SUCCEEDED').length;
-  const authorizedCount = actions.filter((a) => a.status === 'AUTHORIZED' || a.status === 'PROPOSED').length;
   const unknownCount = actions.filter((a) => a.status === 'UNKNOWN').length;
   const blockedCount = actions.filter((a) => a.status === 'BLOCKED').length;
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Play, Shield, ShieldAlert, ShieldCheck, RefreshCw, Lock, Zap, Clock, Terminal } from 'lucide-react';
 import { RecoveryAction, ExecutionResultResponse } from '@/types/action';
-import { executeAction, authorizeAction, reconcileAction, retryAction } from '@/api/actions';
+import { executeAction, authorizeAction, reconcileAction } from '@/api/actions';
 import { ExecutionResultBanner } from './ExecutionResultBanner';
 import { formatEnum } from '@/lib/formatters';
+import { useAuth } from '@/features/auth/AuthContext';
 
 interface ActionExecutionCardProps {
   action: RecoveryAction;
@@ -11,6 +12,9 @@ interface ActionExecutionCardProps {
 }
 
 export const ActionExecutionCard: React.FC<ActionExecutionCardProps> = ({ action, onUpdated }) => {
+  const { role } = useAuth();
+  const canExecute = role === 'ADMIN' || role === 'OPERATOR';
+
   const [currentAction, setCurrentAction] = useState<RecoveryAction>(action);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -19,6 +23,7 @@ export const ActionExecutionCard: React.FC<ActionExecutionCardProps> = ({ action
   const [lastResult, setLastResult] = useState<ExecutionResultResponse | null>(null);
 
   const handleAuthorize = async () => {
+    if (!canExecute) return;
     setIsAuthorizing(true);
     try {
       const res = await authorizeAction(currentAction.action_id, true);
@@ -32,6 +37,7 @@ export const ActionExecutionCard: React.FC<ActionExecutionCardProps> = ({ action
   };
 
   const handleExecute = async () => {
+    if (!canExecute) return;
     setIsExecuting(true);
     setLastResult(null);
     try {
@@ -50,6 +56,7 @@ export const ActionExecutionCard: React.FC<ActionExecutionCardProps> = ({ action
   };
 
   const handleReconcile = async () => {
+    if (!canExecute) return;
     setIsReconciling(true);
     try {
       const updated = await reconcileAction(currentAction.action_id);
@@ -195,7 +202,13 @@ export const ActionExecutionCard: React.FC<ActionExecutionCardProps> = ({ action
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {currentAction.status === 'PROPOSED' && (
+            {!canExecute && (
+              <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Execution requires Operator/Admin role
+              </span>
+            )}
+
+            {currentAction.status === 'PROPOSED' && canExecute && (
               <button
                 onClick={handleAuthorize}
                 disabled={isAuthorizing}
@@ -208,8 +221,13 @@ export const ActionExecutionCard: React.FC<ActionExecutionCardProps> = ({ action
 
             <button
               onClick={handleExecute}
-              disabled={isExecuting || (!isAllowed && currentAction.status !== 'PROPOSED')}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white font-heading font-extrabold text-xs shadow-lg shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+              disabled={isExecuting || !canExecute || (!isAllowed && currentAction.status !== 'PROPOSED')}
+              title={!canExecute ? 'Role Analyst has read-only access' : ''}
+              className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-heading font-extrabold text-xs shadow-lg transition-all w-full sm:w-auto ${
+                canExecute && (isAllowed || currentAction.status === 'PROPOSED')
+                  ? 'bg-gradient-to-r from-indigo-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white shadow-indigo-500/20 active:scale-95 cursor-pointer disabled:opacity-50'
+                  : 'bg-white/10 text-gray-500 border border-white/5 cursor-not-allowed'
+              }`}
             >
               {isExecuting ? (
                 <>
@@ -218,7 +236,7 @@ export const ActionExecutionCard: React.FC<ActionExecutionCardProps> = ({ action
                 </>
               ) : (
                 <>
-                  <Play className="w-3.5 h-3.5 fill-current" />
+                  {!canExecute ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                   <span>Execute Recovery Action</span>
                 </>
               )}

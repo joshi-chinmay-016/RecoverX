@@ -6,10 +6,8 @@ import {
   ShieldCheck,
   FileCheck,
   CheckCircle,
-  ArrowRight,
   ArrowDown,
   ShieldAlert,
-  Zap,
 } from 'lucide-react';
 import { formatEnum } from '@/lib/formatters';
 
@@ -93,7 +91,7 @@ export const AgentFlowDiagram: React.FC<AgentFlowDiagramProps> = ({
     {
       number: 4,
       title: 'Plan Synthesis',
-      desc: 'Structured RecoveryPlan ready for Phase 4 execution',
+      desc: 'Structured RecoveryPlan ready for policy-gated execution',
       icon: <FileCheck className="w-4 h-4" />,
     },
   ];

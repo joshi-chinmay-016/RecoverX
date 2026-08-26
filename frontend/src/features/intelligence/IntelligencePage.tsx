@@ -2,47 +2,27 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getIntelligenceOverview } from '@/api/intelligence';
 import { getLearningOverview, getStrategyRankings, recomputeLearningModel } from '@/api/learning';
-import { MetricCardSkeleton } from '@/components/ui/LoadingSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { PriorityBadge } from '@/components/ui/PriorityBadge';
-import { ScoreRing } from '@/components/ui/ScoreRing';
-import { ProbabilityBar } from '@/components/ui/ProbabilityBar';
-import { formatCurrency, formatEnum, formatDate } from '@/lib/formatters';
+import { formatEnum } from '@/lib/formatters';
 import {
-  BrainCircuit,
   ShieldCheck,
-  Cpu,
-  CheckCircle,
-  HelpCircle,
-  Sliders,
-  Play,
   Layers,
   ArrowRight,
   Sparkles,
-  Zap,
-  Lock,
   Activity,
-  AlertTriangle,
   RefreshCw,
-  TrendingUp,
-  Award,
   GitBranch,
-  ShieldAlert,
-  Gauge,
 } from 'lucide-react';
 
 export const IntelligencePage: React.FC = () => {
   const queryClient = useQueryClient();
 
-  // Tab: 'overview' | 'strategies' | 'calibration'
   const [selectedCategory, setSelectedCategory] = useState<string>('BANK_FAILURE');
-  const [simAmount, setSimAmount] = useState<number>(25000);
+  const [simAmount] = useState<number>(25000);
   const [simRetries, setSimRetries] = useState<number>(0);
 
   // Queries
   const {
-    data: overview,
-    isLoading: isOverviewLoading,
     isError: isOverviewError,
     error: overviewError,
     refetch: refetchOverview,
@@ -53,9 +33,6 @@ export const IntelligencePage: React.FC = () => {
 
   const {
     data: learningData,
-    isLoading: isLearningLoading,
-    refetch: refetchLearning,
-    isFetching: isLearningFetching,
   } = useQuery({
     queryKey: ['learning-overview'],
     queryFn: () => getLearningOverview(),
@@ -349,7 +326,7 @@ export const IntelligencePage: React.FC = () => {
           </div>
           <div className="p-3.5 rounded-xl bg-surface-solid border border-border space-y-1">
             <span className="text-pink-400 font-bold block text-[10px]">Tier 5 (Cold Start)</span>
-            <div className="font-bold text-white">Phase 2 Baseline</div>
+            <div className="font-bold text-white">Deterministic Baseline</div>
             <p className="text-[11px] text-gray-400">Deterministic heuristic ruleset</p>
           </div>
         </div>

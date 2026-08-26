@@ -1,27 +1,30 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from sqlalchemy.orm import Session
 from app.db.models.recovery_case import RecoveryCase
+from app.db.models.payment import Payment
 from app.db.base import RecoveryCaseStatus
 from app.core.logging import logger
 
 
 class RecoveryRepository:
-    """Repository for recovery case operations."""
+    """Repository for recovery case operations with tenant scoping."""
     
     def __init__(self, db: Session):
         self.db = db
     
-    def get_by_payment_id(self, payment_id: str) -> Optional[RecoveryCase]:
-        """Get recovery case by payment ID."""
-        return self.db.query(RecoveryCase).filter(
-            RecoveryCase.payment_id == payment_id
-        ).first()
+    def get_by_payment_id(self, payment_id: str, merchant_id: Optional[Any] = None) -> Optional[RecoveryCase]:
+        """Get recovery case by payment ID, optionally scoped to tenant."""
+        query = self.db.query(RecoveryCase).filter(RecoveryCase.payment_id == payment_id)
+        if merchant_id is not None:
+            query = query.join(Payment, RecoveryCase.payment_id == Payment.id).filter(Payment.merchant_id == merchant_id)
+        return query.first()
     
-    def get_by_id(self, case_id: str) -> Optional[RecoveryCase]:
-        """Get recovery case by ID."""
-        return self.db.query(RecoveryCase).filter(
-            RecoveryCase.id == case_id
-        ).first()
+    def get_by_id(self, case_id: str, merchant_id: Optional[Any] = None) -> Optional[RecoveryCase]:
+        """Get recovery case by ID, optionally scoped to tenant."""
+        query = self.db.query(RecoveryCase).filter(RecoveryCase.id == case_id)
+        if merchant_id is not None:
+            query = query.join(Payment, RecoveryCase.payment_id == Payment.id).filter(Payment.merchant_id == merchant_id)
+        return query.first()
     
     def create_recovery_case(
         self,
@@ -55,12 +58,16 @@ class RecoveryRepository:
     def list_recovery_cases(
         self,
         status: Optional[RecoveryCaseStatus] = None,
+        merchant_id: Optional[Any] = None,
         page: int = 1,
         page_size: int = 20
     ) -> tuple[list[RecoveryCase], int]:
-        """List recovery cases with filters and pagination."""
+        """List recovery cases with filters, tenant isolation, and pagination."""
         query = self.db.query(RecoveryCase)
         
+        if merchant_id is not None:
+            query = query.join(Payment, RecoveryCase.payment_id == Payment.id).filter(Payment.merchant_id == merchant_id)
+
         if status:
             query = query.filter(RecoveryCase.status == status)
         

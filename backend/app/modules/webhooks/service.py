@@ -12,7 +12,7 @@ import redis as redis_lib
 class WebhookService:
     """Service for handling webhook events."""
     
-    def __init__(self, db: Session, redis_client: redis_lib.Redis):
+    def __init__(self, db: Session, redis_client: Optional[redis_lib.Redis] = None):
         self.db = db
         self.redis = redis_client
     
@@ -57,13 +57,71 @@ class WebhookService:
         return webhook_event
     
     def queue_for_processing(self, webhook_event_id: str) -> None:
-        """Queue webhook event for background processing."""
+        """Queue webhook event for background processing, with sync fallback."""
+        if self.redis is not None:
+            try:
+                self.redis.lpush("webhook_queue", webhook_event_id)
+                logger.info(f"webhook_queued webhook_event_id={webhook_event_id}")
+                return
+            except Exception as e:
+                logger.warning(f"webhook_queue_fallback webhook_event_id={webhook_event_id} error={str(e)}")
+        
+        # Fallback to synchronous inline processing
+        self._process_event_sync(webhook_event_id)
+    
+    def _process_event_sync(self, webhook_event_id: str) -> None:
+        """Process event synchronously when Redis is not available."""
+        from app.modules.payments.service import PaymentService
+        from app.modules.recovery.service import RecoveryService
+        from app.utils.audit import AuditService
+        from app.db.base import AuditEventType, ActorType
+        
+        webhook_event = self.db.query(WebhookEvent).filter(
+            WebhookEvent.id == webhook_event_id
+        ).first()
+        if not webhook_event:
+            return
+            
+        webhook_event.processing_status = ProcessingStatus.PROCESSING
+        self.db.commit()
+        
         try:
-            self.redis.lpush("webhook_queue", webhook_event_id)
-            logger.info(f"webhook_queued webhook_event_id={webhook_event_id}")
+            event_type = webhook_event.event_type
+            payload = webhook_event.payload
+            
+            if event_type == "payment.failed":
+                payment_service = PaymentService(self.db)
+                recovery_service = RecoveryService(self.db)
+                payment = payment_service.process_payment_failed(payload)
+                recovery_service.create_recovery_case_for_payment(payment)
+                AuditService.create_audit_event(
+                    db=self.db,
+                    entity_type="Payment",
+                    entity_id=str(payment.id),
+                    event_type=AuditEventType.PAYMENT_STATUS_CHANGED,
+                    actor_type=ActorType.WEBHOOK,
+                    metadata={"razorpay_payment_id": payment.razorpay_payment_id, "status": "FAILED"}
+                )
+            elif event_type == "payment.authorized":
+                payment_service = PaymentService(self.db)
+                payment_service.process_payment_authorized(payload)
+            elif event_type == "payment.captured":
+                payment_service = PaymentService(self.db)
+                payment_service.process_payment_captured(payload)
+            else:
+                webhook_event.processing_status = ProcessingStatus.IGNORED
+                self.db.commit()
+                return
+
+            webhook_event.processed_at = datetime.utcnow()
+            webhook_event.processing_status = ProcessingStatus.PROCESSED
+            self.db.commit()
         except Exception as e:
-            logger.error(f"webhook_queue_failed webhook_event_id={webhook_event_id} error={str(e)}")
-            raise
+            webhook_event.processing_status = ProcessingStatus.FAILED
+            webhook_event.error_message = str(e)
+            webhook_event.processed_at = datetime.utcnow()
+            self.db.commit()
+            logger.error(f"sync_webhook_processing_failed error={str(e)}")
     
     def get_webhook_event(self, event_id: str) -> Optional[WebhookEvent]:
         """Get webhook event by ID."""

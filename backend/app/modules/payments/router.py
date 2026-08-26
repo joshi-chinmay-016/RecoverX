@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.modules.payments.service import PaymentService
 from app.modules.payments.schemas import PaymentResponse, PaymentListResponse
 from app.db.base import PaymentStatus
+from app.auth.dependencies import get_current_tenant, TenantContext
 from app.core.logging import logger
 
 payment_router = APIRouter()
@@ -15,13 +16,15 @@ async def list_payments(
     status: Optional[PaymentStatus] = Query(None, description="Filter by payment status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Page size"),
+    tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db)
 ):
-    """List payments with filters and pagination."""
+    """List payments with filters and pagination scoped to authenticated merchant tenant."""
     payment_service = PaymentService(db)
     
     payments, total = payment_service.list_payments(
         status=status,
+        merchant_id=tenant.merchant.id,
         page=page,
         page_size=page_size
     )
@@ -37,16 +40,17 @@ async def list_payments(
 @payment_router.get("/{payment_id}", response_model=PaymentResponse)
 async def get_payment(
     payment_id: str,
+    tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db)
 ):
-    """Get a specific payment by ID with attempts and recovery case."""
+    """Get a specific payment by ID with attempts and recovery case scoped to authenticated merchant tenant."""
     payment_service = PaymentService(db)
     
-    payment = payment_service.get_payment(payment_id)
+    payment = payment_service.get_payment(payment_id, merchant_id=tenant.merchant.id)
     if not payment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found"
+            detail="Payment not found in tenant financial records"
         )
     
     return payment

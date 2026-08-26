@@ -74,7 +74,7 @@ class FeatureExtractor:
             failure_code=payment.failure_code,
             failure_message=payment.failure_description,
             retry_count=len(attempts),
-            created_at=payment.created_at,
+            created_at=payment.created_at or datetime.utcnow(),
             last_attempt_at=last_attempt.completed_at if last_attempt else None,
             time_since_failure_hours=time_since_failure,
             merchant_historical_success_rate=merchant_stats["success_rate"],
@@ -126,7 +126,12 @@ class FeatureExtractor:
             resolved_count = sum(1 for rc in recovery_cases if rc.status.value == "RESOLVED")
             recovery_rate = resolved_count / len(recovery_cases)
         
-        avg_transaction_value = sum(p.amount_minor for p in payments) / total_count if total_count > 0 else 0
+        captured_payments = [p for p in payments if p.status.value == "CAPTURED"]
+        avg_transaction_value = (
+            sum(p.amount_minor for p in captured_payments) / len(captured_payments)
+            if captured_payments
+            else 0
+        )
         
         return {
             "success_rate": captured_count / total_count if total_count > 0 else 0.0,
@@ -149,14 +154,13 @@ class FeatureExtractor:
             Payment.merchant_id == merchant_id
         ).all()
         
-        if not payments:
-            return 0.5  # Neutral fallback for merchant with no history
+        if not payments or len(payments) <= 1:
+            return 0.5  # Neutral fallback for merchant with no prior history
         
         amounts = [p.amount_minor for p in payments]
         amounts.sort()
         
         # Calculate percentile using deterministic method
-        # For any dataset size, use position-based percentile
         rank = sum(1 for a in amounts if a <= payment_amount)
         percentile = rank / len(amounts) if len(amounts) > 0 else 0.5
         
@@ -165,23 +169,16 @@ class FeatureExtractor:
     def _calculate_normalized_value_score(self, payment_amount: int, merchant_avg: int) -> float:
         """Calculate normalized value score (0.0 to 1.0) relative to merchant average.
         
-        Uses bounded logarithmic scaling to prevent extreme values from dominating.
+        Uses bounded logistic scaling to prevent extreme values from dominating.
         Ensures no single raw amount can automatically drive score to 100.
         """
         if merchant_avg == 0:
             return 0.5  # Neutral fallback
         
-        # Use logarithmic scaling to prevent extreme values from dominating
         import math
-        log_amount = math.log(max(1, payment_amount))
-        log_avg = math.log(max(1, merchant_avg))
+        ratio = payment_amount / merchant_avg
         
-        # Calculate ratio and apply bounded normalization
-        # This ensures that even very large amounts don't automatically get score 1.0
-        ratio = log_amount / (log_avg + 1) if log_avg > 0 else 0.5
-        
-        # Apply sigmoid-like bounding to keep in [0, 1] with center at 0.5
-        # This prevents any single amount from dominating the score
-        normalized = 1 / (1 + math.exp(-ratio + 1))
+        # Logistic sigmoid centered at ratio = 1.0
+        normalized = 1.0 / (1.0 + math.exp(-1.5 * (ratio - 1.0)))
         
         return max(0.0, min(1.0, normalized))

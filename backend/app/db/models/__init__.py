@@ -11,6 +11,8 @@ from app.db.models.recovery_action import RecoveryAction
 from app.db.models.execution_attempt import ExecutionAttempt
 from app.db.models.learning_model_snapshot import LearningModelSnapshot
 from app.db.models.learning_outcome import LearningOutcomeRecord
+from app.db.models.user import User
+from app.db.models.merchant_membership import MerchantMembership
 
 __all__ = [
     "Merchant",
@@ -27,4 +29,6 @@ __all__ = [
     "ExecutionAttempt",
     "LearningModelSnapshot",
     "LearningOutcomeRecord",
+    "User",
+    "MerchantMembership",
 ]

@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   History,
   Shield,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -47,6 +48,12 @@ export const Sidebar: React.FC = () => {
       path: '/actions',
       icon: <Zap className="w-4 h-4 text-pink-400" />,
       badge: 'Execution',
+    },
+    {
+      label: 'Adaptive Learning',
+      path: '/learning',
+      icon: <Sparkles className="w-4 h-4 text-indigo-400" />,
+      badge: 'Adaptive',
     },
     {
       label: 'Policies & Safety',

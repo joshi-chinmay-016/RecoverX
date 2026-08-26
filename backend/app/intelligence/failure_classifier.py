@@ -53,12 +53,12 @@ class FailureClassifier:
         failure_message = features.failure_message or ""
         payment_method = features.payment_method or ""
         
-        # Try to classify by error code first
-        category = self._classify_by_error_code(failure_code)
+        # Try to classify by message first (for high-specificity patterns like insufficient funds, timeout)
+        category = self._classify_by_message(failure_message)
         
-        # If unknown, try by message
+        # If unknown, try by error code
         if category == FailureCategory.UNKNOWN:
-            category = self._classify_by_message(failure_message)
+            category = self._classify_by_error_code(failure_code)
         
         # If still unknown, try by payment method
         if category == FailureCategory.UNKNOWN:
@@ -121,7 +121,9 @@ class FailureClassifier:
         if "card" in payment_method.lower():
             if "insufficient" in message.lower():
                 return FailureCategory.INSUFFICIENT_FUNDS
-            return FailureCategory.PAYMENT_METHOD_FAILURE
+            if any(k in message.lower() for k in ["declined", "expired", "invalid card", "cvv", "card"]):
+                return FailureCategory.PAYMENT_METHOD_FAILURE
+            return FailureCategory.UNKNOWN
         
         # Netbanking-specific failures
         if "netbanking" in payment_method.lower():

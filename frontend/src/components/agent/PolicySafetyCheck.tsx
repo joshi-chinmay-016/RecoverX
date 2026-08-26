@@ -7,6 +7,8 @@ interface PolicySafetyCheckProps {
   policyStatus: PolicyStatus | string;
   policyReason?: string | null;
   policyVersion?: string;
+  requiresApproval?: boolean;
+  confidence?: number;
   className?: string;
 }
 
@@ -16,7 +18,6 @@ export const PolicySafetyCheck: React.FC<PolicySafetyCheckProps> = ({
   policyVersion = 'policy-v1',
   className,
 }) => {
-  const isAllowed = policyStatus === 'ALLOWED';
   const isBlocked = policyStatus === 'BLOCKED';
 
   return (

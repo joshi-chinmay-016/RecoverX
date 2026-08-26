@@ -8,6 +8,12 @@ import enum
 Base = declarative_base()
 
 
+class UserRole(str, enum.Enum):
+    ADMIN = "ADMIN"
+    OPERATOR = "OPERATOR"
+    ANALYST = "ANALYST"
+
+
 class PaymentStatus(str, enum.Enum):
     CREATED = "CREATED"
     AUTHORIZED = "AUTHORIZED"
@@ -43,6 +49,14 @@ class AuditEventType(str, enum.Enum):
     ACTION_RECONCILED = "ACTION_RECONCILED"
     ACTION_CANCELLED = "ACTION_CANCELLED"
     RECOVERY_VERIFIED = "RECOVERY_VERIFIED"
+    # Phase 6 Security and Identity Audit Events
+    USER_LOGIN_SUCCESS = "USER_LOGIN_SUCCESS"
+    USER_LOGIN_FAILURE = "USER_LOGIN_FAILURE"
+    TOKEN_REJECTED = "TOKEN_REJECTED"
+    ROLE_CHANGED = "ROLE_CHANGED"
+    MEMBERSHIP_CREATED = "MEMBERSHIP_CREATED"
+    MEMBERSHIP_DISABLED = "MEMBERSHIP_DISABLED"
+    POLICY_CHANGED = "POLICY_CHANGED"
 
 
 class ActorType(str, enum.Enum):

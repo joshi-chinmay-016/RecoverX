@@ -51,11 +51,8 @@ class PolicyRules:
     @staticmethod
     def validate_payment_eligible(payment_status: str) -> bool:
         """Validate if payment is eligible for recovery actions."""
-        # Cannot act on already successful payments
-        if payment_status == "CAPTURED":
-            return False
-        # Cannot act on created payments (not yet attempted)
-        if payment_status == "CREATED":
+        # Cannot act on already successful or authorized/created payments
+        if payment_status in ["CAPTURED", "CREATED", "AUTHORIZED"]:
             return False
         return True
     

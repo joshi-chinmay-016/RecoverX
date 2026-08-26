@@ -18,7 +18,6 @@ import {
   AlertCircle,
   Lightbulb,
   Cpu,
-  History,
   CheckCircle2,
   TrendingUp,
   Zap,
@@ -132,10 +131,10 @@ export const OpportunityDetailPage: React.FC = () => {
         <div className="p-5 rounded-2xl bg-surface-card border border-border flex flex-col justify-between">
           <span className="text-xs font-mono uppercase text-gray-400 font-semibold block">Recovery Likelihood</span>
           <div className="mt-2">
-            <ProbabilityBar probability={opportunity.recovery_likelihood} showLabel={false} />
+            <ProbabilityBar probability={opportunity.recovery_probability} />
             <div className="flex justify-between items-center text-xs font-mono mt-1 text-gray-300">
               <span>Likelihood:</span>
-              <strong className="text-emerald-400">{Math.round(opportunity.recovery_likelihood * 100)}%</strong>
+              <strong className="text-emerald-400">{Math.round(opportunity.recovery_probability * 100)}%</strong>
             </div>
           </div>
         </div>
@@ -160,7 +159,7 @@ export const OpportunityDetailPage: React.FC = () => {
               {formatEnum(opportunity.failure_category)}
             </span>
             <span className="text-[11px] text-gray-400 font-mono mt-0.5 block">
-              Confidence: {Math.round((opportunity.category_confidence || 0.9) * 100)}%
+              Confidence: {Math.round((opportunity.confidence || 0.9) * 100)}%
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">

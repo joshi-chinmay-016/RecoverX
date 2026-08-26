@@ -13,8 +13,6 @@ import { ActionExecutionCard } from '@/components/execution/ActionExecutionCard'
 import { DecisionTraceTimeline } from '@/components/agent/DecisionTraceTimeline';
 import { PriorityBadge } from '@/components/ui/PriorityBadge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { formatCurrency, formatEnum, formatDate } from '@/lib/formatters';
 import {
   Bot,
@@ -22,12 +20,9 @@ import {
   Eye,
   CheckCircle2,
   Lock,
-  Layers,
   Sparkles,
   RefreshCw,
-  Clock,
   History,
-  ShieldCheck,
   Zap,
 } from 'lucide-react';
 
@@ -221,7 +216,7 @@ export const AgentStudioPage: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-surface-solid border border-border">
               <span className="text-gray-400 block text-[10px] uppercase font-semibold">Recovery Likelihood</span>
               <span className="font-bold text-sm text-emerald-400 mt-0.5 block">
-                {Math.round(currentOpportunity.recovery_likelihood * 100)}%
+                {Math.round(currentOpportunity.recovery_probability * 100)}%
               </span>
             </div>
 
@@ -287,8 +282,8 @@ export const AgentStudioPage: React.FC = () => {
           </div>
 
           {/* Decision Trace Timeline */}
-          {agentResult.plan.decision_trace && agentResult.plan.decision_trace.length > 0 && (
-            <DecisionTraceTimeline traces={agentResult.plan.decision_trace} />
+          {(agentResult.plan as any)?.decision_trace && (agentResult.plan as any).decision_trace.length > 0 && (
+            <DecisionTraceTimeline traces={(agentResult.plan as any).decision_trace} />
           )}
 
           {/* Proposed Actions Specifications */}
@@ -321,7 +316,7 @@ export const AgentStudioPage: React.FC = () => {
                 <div>
                   <h4 className="font-heading font-bold text-base text-emerald-300 flex items-center gap-2">
                     <Zap className="w-4 h-4 text-emerald-400" />
-                    Phase 4 Execution Gate Ready
+                    Policy-Gated Execution Ready
                   </h4>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Authorized actions generated from the recovery plan ready for safe dispatch via MockPaymentAdapter.

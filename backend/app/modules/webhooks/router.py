@@ -56,7 +56,10 @@ async def receive_razorpay_webhook(
             )
         
         # Step 3: Initialize Redis and service
-        redis_client = redis_lib.from_url(settings.redis_url)
+        try:
+            redis_client = redis_lib.from_url(settings.redis_url)
+        except Exception:
+            redis_client = None
         webhook_service = WebhookService(db, redis_client)
         
         # Step 4: Check for duplicate (idempotency)
@@ -121,8 +124,7 @@ async def list_webhook_events(
     db: Session = Depends(get_db)
 ):
     """List webhook events with filters and pagination."""
-    redis_client = redis_lib.from_url(settings.redis_url)
-    webhook_service = WebhookService(db, redis_client)
+    webhook_service = WebhookService(db, None)
     
     events, total = webhook_service.list_webhook_events(
         event_type=event_type,
@@ -147,8 +149,7 @@ async def get_webhook_event(
     db: Session = Depends(get_db)
 ):
     """Get a specific webhook event by ID."""
-    redis_client = redis_lib.from_url(settings.redis_url)
-    webhook_service = WebhookService(db, redis_client)
+    webhook_service = WebhookService(db, None)
     
     event = webhook_service.get_webhook_event(event_id)
     if not event:

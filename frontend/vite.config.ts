@@ -10,6 +10,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    cssMinify: false,
+  },
   server: {
     port: 5173,
     proxy: {

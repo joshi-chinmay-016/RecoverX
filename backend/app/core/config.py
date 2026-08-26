@@ -1,5 +1,7 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from functools import lru_cache
+from typing import Union, List
 
 
 class Settings(BaseSettings):
@@ -35,9 +37,50 @@ class Settings(BaseSettings):
     max_retry_attempts: int = 3
     agent_confidence_threshold: float = 0.5
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # Phase 6 Security & Multi-Tenancy Configuration
+    jwt_secret: str = "recoverx-production-jwt-secret-key-2026-secure"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_hours: int = 8
+    cors_origins: Union[List[str], str] = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:4173",
+        "http://localhost:8000",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:4173",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8080",
+    ]
+    cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:[0-9]+)?$"
+    login_rate_limit_attempts: int = 15
+    login_rate_limit_window_seconds: int = 60
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
 
 @lru_cache()

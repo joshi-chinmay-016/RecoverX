@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { formatCurrency, formatEnum, formatDate } from '@/lib/formatters';
-import { History, Shield, Bot, CreditCard, Filter } from 'lucide-react';
+import { Bot, CreditCard } from 'lucide-react';
 
 export const AuditPage: React.FC = () => {
   const [tab, setTab] = useState<'payments' | 'agent_runs'>('payments');

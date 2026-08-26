@@ -229,23 +229,29 @@ class IntelligenceService:
             updated_at=result.updated_at,
         )
     
-    def get_intelligence_result(self, result_id: str) -> Optional[IntelligenceResult]:
-        """Get intelligence result by ID."""
-        result = self.db.query(RevenueIntelligenceResult).filter(
+    def get_intelligence_result(self, result_id: str, merchant_id: Optional[Any] = None) -> Optional[IntelligenceResult]:
+        """Get intelligence result by ID, optionally scoped to tenant."""
+        query = self.db.query(RevenueIntelligenceResult).filter(
             RevenueIntelligenceResult.id == result_id
-        ).first()
-        
+        )
+        if merchant_id is not None:
+            query = query.join(Payment, RevenueIntelligenceResult.payment_id == Payment.id).filter(Payment.merchant_id == merchant_id)
+
+        result = query.first()
         if not result:
             return None
         
         return self._to_schema(result)
     
-    def get_intelligence_by_payment(self, payment_id: str) -> Optional[IntelligenceResult]:
-        """Get intelligence result by payment ID."""
-        result = self.db.query(RevenueIntelligenceResult).filter(
+    def get_intelligence_by_payment(self, payment_id: str, merchant_id: Optional[Any] = None) -> Optional[IntelligenceResult]:
+        """Get intelligence result by payment ID, optionally scoped to tenant."""
+        query = self.db.query(RevenueIntelligenceResult).filter(
             RevenueIntelligenceResult.payment_id == payment_id
-        ).first()
-        
+        )
+        if merchant_id is not None:
+            query = query.join(Payment, RevenueIntelligenceResult.payment_id == Payment.id).filter(Payment.merchant_id == merchant_id)
+
+        result = query.first()
         if not result:
             return None
         
@@ -255,12 +261,16 @@ class IntelligenceService:
         self,
         priority: Optional[PriorityLevel] = None,
         failure_category: Optional[FailureCategory] = None,
+        merchant_id: Optional[Any] = None,
         page: int = 1,
         page_size: int = 20,
     ) -> OpportunityListResponse:
-        """List recovery opportunities with filters."""
+        """List recovery opportunities with filters and tenant scoping."""
         query = self.db.query(RevenueIntelligenceResult)
         
+        if merchant_id is not None:
+            query = query.join(Payment, RevenueIntelligenceResult.payment_id == Payment.id).filter(Payment.merchant_id == merchant_id)
+
         if priority:
             query = query.filter(RevenueIntelligenceResult.priority == priority)
         
@@ -283,10 +293,13 @@ class IntelligenceService:
             page_size=page_size,
         )
     
-    def get_overview(self) -> IntelligenceOverview:
-        """Get merchant-level aggregate intelligence."""
-        # Get all intelligence results
-        results = self.db.query(RevenueIntelligenceResult).all()
+    def get_overview(self, merchant_id: Optional[Any] = None) -> IntelligenceOverview:
+        """Get merchant-level aggregate intelligence scoped to tenant."""
+        # Get all intelligence results for this merchant
+        query = self.db.query(RevenueIntelligenceResult)
+        if merchant_id is not None:
+            query = query.join(Payment, RevenueIntelligenceResult.payment_id == Payment.id).filter(Payment.merchant_id == merchant_id)
+        results = query.all()
         
         # Calculate aggregates
         total_revenue_at_risk = sum(r.revenue_at_risk for r in results)
@@ -316,10 +329,13 @@ class IntelligenceService:
         ]
         
         # Get total revenue from payments (for context)
-        from app.db.models.payment import Payment
-        payments = self.db.query(Payment).all()
+        payments_query = self.db.query(Payment)
+        if merchant_id is not None:
+            payments_query = payments_query.filter(Payment.merchant_id == merchant_id)
+        payments = payments_query.all()
+
         total_revenue = sum(p.amount_minor for p in payments)
-        failed_revenue = sum(p.amount_minor for p in payments if p.status.value == "FAILED")
+        failed_revenue = sum(p.amount_minor for p in payments if (p.status.value if hasattr(p.status, "value") else str(p.status)) == "FAILED")
         
         return IntelligenceOverview(
             total_revenue=total_revenue,

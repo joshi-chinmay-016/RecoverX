@@ -9,11 +9,22 @@ import { AgentRunDetailPage } from '@/features/agent/AgentRunDetailPage';
 import { ActionsPage } from '@/features/actions/ActionsPage';
 import { PoliciesPage } from '@/features/policies/PoliciesPage';
 import { AuditPage } from '@/features/audit/AuditPage';
+import { LearningPage } from '@/features/learning/LearningPage';
+import { LoginPage } from '@/features/auth/LoginPage';
+import { ProtectedRoute } from '@/features/auth/ProtectedRoute';
 
 export const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -42,6 +53,10 @@ export const router = createBrowserRouter([
       {
         path: 'actions',
         element: <ActionsPage />,
+      },
+      {
+        path: 'learning',
+        element: <LearningPage />,
       },
       {
         path: 'policies',

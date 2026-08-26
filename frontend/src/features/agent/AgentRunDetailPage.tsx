@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { MetricCardSkeleton } from '@/components/ui/LoadingSkeleton';
 import { formatEnum, formatDate } from '@/lib/formatters';
-import { ArrowLeft, Bot, Sparkles, Clock, Layers, Lock } from 'lucide-react';
+import { ArrowLeft, Layers, Lock } from 'lucide-react';
 
 export const AgentRunDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

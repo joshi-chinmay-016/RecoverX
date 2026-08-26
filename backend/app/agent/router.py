@@ -1,4 +1,4 @@
-"""API Router for Phase 3 Agent."""
+"""API Router for Phase 3 Agent with Tenant Isolation."""
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from typing import Optional
@@ -15,6 +15,8 @@ from app.agent.schemas import (
 )
 from app.db.models.agent_run import AgentRun as AgentRunModel
 from app.db.models.revenue_intelligence import RevenueIntelligenceResult
+from app.db.models.payment import Payment
+from app.auth.dependencies import get_current_tenant, TenantContext
 from app.core.logging import get_logger
 import json
 from datetime import datetime
@@ -30,22 +32,27 @@ async def analyze_opportunity(
     opportunity_id: str,
     request: Optional[AgentRunRequest] = None,
     background_tasks: BackgroundTasks = None,
+    tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db),
 ):
     req = request or AgentRunRequest()
-    """Run the AI recovery agent on an opportunity."""
+    """Run the AI recovery agent on an opportunity scoped to authenticated tenant."""
     
-    # Check if intelligence result exists
-    intelligence = db.query(RevenueIntelligenceResult).filter(
-        RevenueIntelligenceResult.id == opportunity_id
+    # Check if intelligence result exists and belongs to tenant
+    intelligence = db.query(RevenueIntelligenceResult).join(
+        Payment, RevenueIntelligenceResult.payment_id == Payment.id
+    ).filter(
+        RevenueIntelligenceResult.id == opportunity_id,
+        Payment.merchant_id == tenant.merchant.id,
     ).first()
     
     if not intelligence:
-        raise HTTPException(status_code=404, detail="Intelligence result not found")
+        raise HTTPException(status_code=404, detail="Opportunity not found in tenant financial records")
     
     # Check for existing run
     existing_run = db.query(AgentRunModel).filter(
         AgentRunModel.opportunity_id == opportunity_id,
+        AgentRunModel.merchant_id == tenant.merchant.id,
         AgentRunModel.status.in_([AgentRunStatus.INVESTIGATING, AgentRunStatus.PLANNING, AgentRunStatus.VALIDATING]),
     ).first()
     
@@ -127,10 +134,11 @@ async def list_agent_runs(
     page_size: int = Query(20, ge=1, le=100, description="Page size"),
     opportunity_id: Optional[str] = Query(None, description="Filter by opportunity ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db),
 ):
-    """List agent runs with pagination and filters."""
-    query = db.query(AgentRunModel)
+    """List agent runs scoped to authenticated merchant tenant."""
+    query = db.query(AgentRunModel).filter(AgentRunModel.merchant_id == tenant.merchant.id)
     
     if opportunity_id:
         query = query.filter(AgentRunModel.opportunity_id == opportunity_id)
@@ -171,16 +179,17 @@ async def list_agent_runs(
 @router.get("/runs/{run_id}", response_model=dict)
 async def get_agent_run(
     run_id: str,
+    tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db),
 ):
-    """Get an agent run by ID."""
-    
+    """Get an agent run by ID scoped to tenant."""
     agent_run = db.query(AgentRunModel).filter(
-        AgentRunModel.run_id == run_id
+        AgentRunModel.run_id == run_id,
+        AgentRunModel.merchant_id == tenant.merchant.id,
     ).first()
     
     if not agent_run:
-        raise HTTPException(status_code=404, detail="Agent run not found")
+        raise HTTPException(status_code=404, detail="Agent run not found in tenant records")
     
     return {
         "run_id": agent_run.run_id,
@@ -207,16 +216,17 @@ async def get_agent_run(
 @router.get("/runs/{run_id}/trace", response_model=dict)
 async def get_agent_trace(
     run_id: str,
+    tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db),
 ):
-    """Get decision trace and tool activity for an agent run."""
-    
+    """Get decision trace and tool activity for an agent run scoped to tenant."""
     agent_run = db.query(AgentRunModel).filter(
-        AgentRunModel.run_id == run_id
+        AgentRunModel.run_id == run_id,
+        AgentRunModel.merchant_id == tenant.merchant.id,
     ).first()
     
     if not agent_run:
-        raise HTTPException(status_code=404, detail="Agent run not found")
+        raise HTTPException(status_code=404, detail="Agent run not found in tenant records")
     
     return {
         "run_id": agent_run.run_id,
@@ -229,17 +239,19 @@ async def get_agent_trace(
 @router.post("/preview/{opportunity_id}", response_model=AgentRunResponse)
 async def preview_opportunity(
     opportunity_id: str,
+    tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db),
 ):
-    """Generate a plan without execution (dry run / preview)."""
-    
-    # Check if intelligence result exists
-    intelligence = db.query(RevenueIntelligenceResult).filter(
-        RevenueIntelligenceResult.id == opportunity_id
+    """Generate a plan without execution (dry run / preview) scoped to tenant."""
+    intelligence = db.query(RevenueIntelligenceResult).join(
+        Payment, RevenueIntelligenceResult.payment_id == Payment.id
+    ).filter(
+        RevenueIntelligenceResult.id == opportunity_id,
+        Payment.merchant_id == tenant.merchant.id,
     ).first()
     
     if not intelligence:
-        raise HTTPException(status_code=404, detail="Intelligence result not found")
+        raise HTTPException(status_code=404, detail="Opportunity not found in tenant financial records")
     
     # Create orchestrator
     orchestrator = AgentOrchestrator(db)
@@ -248,7 +260,6 @@ async def preview_opportunity(
     try:
         state = await orchestrator.analyze_opportunity(opportunity_id)
         
-        # Mark as preview (no persistence)
         return AgentRunResponse(
             run_id=state.run_id,
             status=state.status,
@@ -266,7 +277,9 @@ async def preview_opportunity(
 
 
 @router.get("/policy", response_model=dict)
-async def get_policy():
+async def get_policy(
+    tenant: TenantContext = Depends(get_current_tenant),
+):
     """Get current policy configuration."""
     from app.agent.policy.engine import PolicyEngine
     

@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from sqlalchemy.orm import Session
 from app.db.models.recovery_case import RecoveryCase
 from app.db.models.payment import Payment
@@ -39,15 +39,16 @@ class RecoveryService:
             return recovery_case
         return None
     
-    def get_recovery_case(self, case_id: str) -> Optional[RecoveryCase]:
-        """Get recovery case by ID."""
-        return self.repository.get_by_id(case_id)
+    def get_recovery_case(self, case_id: str, merchant_id: Optional[Any] = None) -> Optional[RecoveryCase]:
+        """Get recovery case by ID, optionally scoped to tenant."""
+        return self.repository.get_by_id(case_id, merchant_id=merchant_id)
     
     def list_recovery_cases(
         self,
         status: Optional[RecoveryCaseStatus] = None,
+        merchant_id: Optional[Any] = None,
         page: int = 1,
         page_size: int = 20
     ) -> tuple[list[RecoveryCase], int]:
-        """List recovery cases with filters."""
-        return self.repository.list_recovery_cases(status, page, page_size)
+        """List recovery cases with filters and tenant isolation."""
+        return self.repository.list_recovery_cases(status, merchant_id=merchant_id, page=page, page_size=page_size)

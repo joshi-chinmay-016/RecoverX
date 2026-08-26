@@ -4,8 +4,7 @@ import { getPolicySummary } from '@/api/agent';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { MetricCardSkeleton } from '@/components/ui/LoadingSkeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { formatEnum } from '@/lib/formatters';
-import { ShieldCheck, Lock, UserCheck, AlertTriangle, CheckCircle, Shield } from 'lucide-react';
+import { ShieldCheck, Lock, UserCheck, CheckCircle, Shield } from 'lucide-react';
 
 export const PoliciesPage: React.FC = () => {
   const {

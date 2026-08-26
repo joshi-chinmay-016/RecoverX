@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.db.models.payment import Payment
@@ -20,12 +20,13 @@ class PaymentRepository:
             Payment.razorpay_payment_id == razorpay_payment_id
         ).first()
     
-    def get_by_id(self, payment_id: str) -> Optional[Payment]:
-        """Get payment by internal ID."""
-        return self.db.query(Payment).filter(
-            Payment.id == payment_id
-        ).first()
-    
+    def get_by_id(self, payment_id: str, merchant_id: Optional[Any] = None) -> Optional[Payment]:
+        """Get payment by internal ID, optionally scoped to tenant."""
+        query = self.db.query(Payment).filter(Payment.id == payment_id)
+        if merchant_id is not None:
+            query = query.filter(Payment.merchant_id == merchant_id)
+        return query.first()
+
     def create_payment(
         self,
         razorpay_payment_id: str,
@@ -78,12 +79,16 @@ class PaymentRepository:
     def list_payments(
         self,
         status: Optional[PaymentStatus] = None,
+        merchant_id: Optional[Any] = None,
         page: int = 1,
         page_size: int = 20
     ) -> tuple[list[Payment], int]:
-        """List payments with filters and pagination."""
+        """List payments with filters, tenant isolation, and pagination."""
         query = self.db.query(Payment)
         
+        if merchant_id is not None:
+            query = query.filter(Payment.merchant_id == merchant_id)
+
         if status:
             query = query.filter(Payment.status == status)
         

@@ -4,7 +4,7 @@ Validates agent output to ensure safety and correctness.
 """
 
 from typing import Dict, Any, Optional, List
-from app.agent.schemas import RecoveryPlan, ActionType, AgentAction
+from app.agent.schemas import RecoveryPlan, ActionType, AgentAction, PolicyStatus
 from app.agent.strategies.registry import ActionRegistry
 from app.core.logging import get_logger
 
@@ -59,15 +59,19 @@ class PlanValidator:
             
             # Construct RecoveryPlan
             plan = RecoveryPlan(
+                opportunity_id=plan_data.get("opportunity_id", "opp_default"),
+                payment_id=plan_data.get("payment_id", "pay_default"),
+                merchant_id=plan_data.get("merchant_id", "mer_default"),
                 summary=self.sanitize_untrusted_data(plan_data["summary"]),
                 diagnosis=self.sanitize_untrusted_data(plan_data["diagnosis"]),
                 selected_strategy=ActionType(selected_strategy),
                 reasoning=self.sanitize_untrusted_data(plan_data["reasoning"]),
                 confidence=confidence,
                 proposed_actions=validated_actions,
-                fallback_strategy=ActionType(plan_data["fallback_strategy"]) if plan_data.get("fallback_strategy") else None,
+                fallback_strategy=str(plan_data.get("fallback_strategy", "MANUAL_REVIEW")),
                 requires_approval=plan_data.get("requires_approval", False),
                 approval_reason=plan_data.get("approval_reason"),
+                policy_status=PolicyStatus(plan_data.get("policy_status", "ALLOWED")),
             )
             
             return True, None, plan
