@@ -25,7 +25,7 @@ export const Sidebar: React.FC = () => {
   const navItems: NavItem[] = [
     {
       label: 'Overview',
-      path: '/',
+      path: '/overview',
       icon: <LayoutDashboard className="w-4 h-4" />,
     },
     {
@@ -124,7 +124,7 @@ export const Sidebar: React.FC = () => {
       <div className="p-4 space-y-3">
         {/* 3D Showcase Link */}
         <Link
-          to="/landing"
+          to="/"
           className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-500/30 hover:border-pink-500/50 text-xs font-semibold text-gray-200 transition-all group"
         >
           <div className="flex items-center gap-2">

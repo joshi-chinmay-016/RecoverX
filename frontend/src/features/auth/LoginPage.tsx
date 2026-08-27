@@ -17,8 +17,9 @@ export const LoginPage: React.FC = () => {
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
-      const from = (location.state as any)?.from?.pathname || '/';
-      navigate(from, { replace: true });
+      const from = (location.state as any)?.from?.pathname;
+      const target = from && from !== '/' && from !== '/login' && from !== '/register' ? from : '/overview';
+      navigate(target, { replace: true });
     }
   }, [isAuthenticated, navigate, location]);
 
@@ -33,8 +34,9 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       await login(email, password);
-      const from = (location.state as any)?.from?.pathname || '/';
-      navigate(from, { replace: true });
+      const from = (location.state as any)?.from?.pathname;
+      const target = from && from !== '/' && from !== '/login' && from !== '/register' ? from : '/overview';
+      navigate(target, { replace: true });
     } catch (err: any) {
       setError(err?.message || 'Authentication failed. Please verify your credentials.');
     } finally {
@@ -72,7 +74,7 @@ export const LoginPage: React.FC = () => {
         <div className="mt-4 flex justify-center">
           <button
             type="button"
-            onClick={() => navigate('/landing')}
+            onClick={() => navigate('/')}
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-pink-500/20 border border-indigo-500/40 text-xs font-semibold text-indigo-300 hover:text-white hover:border-pink-500/60 transition-all cursor-pointer shadow-sm"
           >
             <span>✨ View 3D Product Showcase & Live Simulator</span>

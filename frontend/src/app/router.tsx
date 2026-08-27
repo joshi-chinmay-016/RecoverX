@@ -15,6 +15,11 @@ import { LandingPage } from '@/features/landing/LandingPage';
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute';
 
 export const router = createBrowserRouter([
+  // Public Routes
+  {
+    path: '/',
+    element: <LandingPage />,
+  },
   {
     path: '/landing',
     element: <LandingPage />,
@@ -24,7 +29,11 @@ export const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
-    path: '/',
+    path: '/register',
+    element: <LoginPage />,
+  },
+  // Protected Application Dashboard Routes
+  {
     element: (
       <ProtectedRoute>
         <AppLayout />
@@ -32,43 +41,43 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
-        index: true,
+        path: '/overview',
         element: <OverviewPage />,
       },
       {
-        path: 'intelligence',
+        path: '/intelligence',
         element: <IntelligencePage />,
       },
       {
-        path: 'opportunities',
+        path: '/opportunities',
         element: <OpportunitiesPage />,
       },
       {
-        path: 'opportunities/:id',
+        path: '/opportunities/:id',
         element: <OpportunityDetailPage />,
       },
       {
-        path: 'agent',
+        path: '/agent',
         element: <AgentStudioPage />,
       },
       {
-        path: 'agent/runs/:id',
+        path: '/agent/runs/:id',
         element: <AgentRunDetailPage />,
       },
       {
-        path: 'actions',
+        path: '/actions',
         element: <ActionsPage />,
       },
       {
-        path: 'learning',
+        path: '/learning',
         element: <LearningPage />,
       },
       {
-        path: 'policies',
+        path: '/policies',
         element: <PoliciesPage />,
       },
       {
-        path: 'audit',
+        path: '/audit',
         element: <AuditPage />,
       },
       {
@@ -76,5 +85,10 @@ export const router = createBrowserRouter([
         element: <Navigate to="/" replace />,
       },
     ],
+  },
+  // Catch-all Fallback
+  {
+    path: '*',
+    element: <Navigate to="/" replace />,
   },
 ]);
