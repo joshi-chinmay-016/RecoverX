@@ -11,9 +11,14 @@ import { PoliciesPage } from '@/features/policies/PoliciesPage';
 import { AuditPage } from '@/features/audit/AuditPage';
 import { LearningPage } from '@/features/learning/LearningPage';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { LandingPage } from '@/features/landing/LandingPage';
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute';
 
 export const router = createBrowserRouter([
+  {
+    path: '/landing',
+    element: <LandingPage />,
+  },
   {
     path: '/login',
     element: <LoginPage />,

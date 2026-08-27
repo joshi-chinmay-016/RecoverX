@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
   BrainCircuit,
@@ -10,6 +10,7 @@ import {
   History,
   Shield,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -119,12 +120,27 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* Safety Policy Status Card */}
-      <div className="p-4 m-4 rounded-xl bg-surface-card border border-indigo-500/20 text-[11px] text-gray-300 flex items-start gap-2.5">
-        <Shield className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-        <div>
-          <span className="font-semibold block text-indigo-300">Policy Guardrails Active</span>
-          Controlled execution layer active. Only authorized actions execute via MockPaymentAdapter.
+      {/* Footer Navigation Area */}
+      <div className="p-4 space-y-3">
+        {/* 3D Showcase Link */}
+        <Link
+          to="/landing"
+          className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-500/30 hover:border-pink-500/50 text-xs font-semibold text-gray-200 transition-all group"
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-pink-400 group-hover:rotate-12 transition-transform" />
+            <span>3D Product Tour</span>
+          </div>
+          <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-white" />
+        </Link>
+
+        {/* Safety Policy Status Card */}
+        <div className="p-3.5 rounded-xl bg-surface-card border border-indigo-500/20 text-[11px] text-gray-300 flex items-start gap-2.5">
+          <Shield className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold block text-indigo-300">Policy Guardrails Active</span>
+            Controlled execution layer active.
+          </div>
         </div>
       </div>
     </aside>

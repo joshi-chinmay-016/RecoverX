@@ -23,6 +23,8 @@ from app.db.models.execution_attempt import ExecutionAttempt
 from app.db.models.revenue_intelligence import RevenueIntelligenceResult
 from app.db.models.agent_run import AgentRun
 from app.db.models.audit_event import AuditEvent
+from app.db.models.learning_outcome import LearningOutcomeRecord
+from app.intelligence.schemas import FailureCategory
 from app.agent.schemas import ActionType
 from app.execution.schemas import (
     ProviderResult,
@@ -98,8 +100,9 @@ class ExecutionService:
         self._record_audit(
             entity_type="RecoveryAction",
             entity_id=action.id,
-            event_type=AuditEventType.ACTION_PROPOSED,
+            event_type=AuditEventType.POLICY_DECISION,
             metadata={
+                "event_subtype": "ACTION_PROPOSED",
                 "action_id": action.action_id,
                 "action_type": action.action_type.value,
                 "payment_id": str(payment.id),
@@ -161,7 +164,7 @@ class ExecutionService:
             ActionStateMachine.transition(action.status, ActionStatus.AUTHORIZED)
             action.status = ActionStatus.AUTHORIZED
             action.authorized_at = datetime.utcnow()
-            event_type = AuditEventType.ACTION_AUTHORIZED
+            event_type = AuditEventType.POLICY_DECISION
         elif decision.decision == PolicyStatus.REQUIRES_APPROVAL:
             ActionStateMachine.transition(action.status, ActionStatus.REQUIRES_APPROVAL)
             action.status = ActionStatus.REQUIRES_APPROVAL
@@ -169,7 +172,7 @@ class ExecutionService:
         else:
             ActionStateMachine.transition(action.status, ActionStatus.BLOCKED)
             action.status = ActionStatus.BLOCKED
-            event_type = AuditEventType.ACTION_BLOCKED
+            event_type = AuditEventType.POLICY_DECISION
 
         self._record_audit(
             entity_type="RecoveryAction",
@@ -372,6 +375,13 @@ class ExecutionService:
                 metadata={"recovered_by_action": action.action_id, "provider_ref": provider_result.provider_reference},
             )
 
+            self._record_learning_outcome(
+                action=action,
+                payment=payment,
+                outcome_status=ActionStatus.SUCCEEDED,
+                latency_ms=provider_result.latency_ms,
+            )
+
             self.db.commit()
             return ExecutionResultResponse(
                 action_id=action.action_id,
@@ -395,6 +405,12 @@ class ExecutionService:
                 entity_id=action.id,
                 event_type=AuditEventType.ACTION_EXECUTED,
                 metadata={"status": "UNKNOWN", "error": provider_result.error_message, "attempt": attempt_number},
+            )
+            self._record_learning_outcome(
+                action=action,
+                payment=payment,
+                outcome_status=ActionStatus.UNKNOWN,
+                latency_ms=provider_result.latency_ms,
             )
             self.db.commit()
             return ExecutionResultResponse(
@@ -431,6 +447,12 @@ class ExecutionService:
                     "attempt": attempt_number,
                 },
             )
+            self._record_learning_outcome(
+                action=action,
+                payment=payment,
+                outcome_status=action.status,
+                latency_ms=provider_result.latency_ms,
+            )
             self.db.commit()
             return ExecutionResultResponse(
                 action_id=action.action_id,
@@ -453,10 +475,10 @@ class ExecutionService:
         ref = action.provider_reference or f"mock_rec_{action.idempotency_key[-8:]}"
         result = await self.payment_adapter.check_transaction_status(ref)
 
+        payment = self.db.query(Payment).filter(Payment.id == action.payment_id).first()
         if result.success:
             action.status = ActionStatus.SUCCEEDED
             action.completed_at = datetime.utcnow()
-            payment = self.db.query(Payment).filter(Payment.id == action.payment_id).first()
             if payment:
                 payment.transition_to(PaymentStatus.CAPTURED)
                 recovery_case = self.db.query(RecoveryCase).filter(RecoveryCase.payment_id == payment.id).first()
@@ -466,11 +488,18 @@ class ExecutionService:
             action.status = ActionStatus.FAILED
             action.completed_at = datetime.utcnow()
 
+        self._record_learning_outcome(
+            action=action,
+            payment=payment,
+            outcome_status=action.status,
+            latency_ms=result.latency_ms if hasattr(result, 'latency_ms') else 100,
+        )
+
         self._record_audit(
             entity_type="RecoveryAction",
             entity_id=action.id,
-            event_type=AuditEventType.ACTION_RECONCILED,
-            metadata={"reconciled_status": action.status.value, "provider_ref": ref},
+            event_type=AuditEventType.ACTION_EXECUTED,
+            metadata={"event_subtype": "ACTION_RECONCILED", "reconciled_status": action.status.value, "provider_ref": ref},
         )
         self.db.commit()
         self.db.refresh(action)
@@ -488,8 +517,8 @@ class ExecutionService:
         self._record_audit(
             entity_type="RecoveryAction",
             entity_id=action.id,
-            event_type=AuditEventType.ACTION_CANCELLED,
-            metadata={"reason": reason},
+            event_type=AuditEventType.ACTION_EXECUTED,
+            metadata={"event_subtype": "ACTION_CANCELLED", "reason": reason},
         )
         self.db.commit()
         self.db.refresh(action)
@@ -545,3 +574,46 @@ class ExecutionService:
             audit_metadata=metadata,
         )
         self.db.add(audit)
+
+    def _record_learning_outcome(
+        self,
+        action: RecoveryAction,
+        payment: Optional[Payment],
+        outcome_status: ActionStatus,
+        latency_ms: int,
+    ) -> Optional[LearningOutcomeRecord]:
+        """Record a closed-loop LearningOutcomeRecord for adaptive strategy calibration."""
+        try:
+            category = FailureCategory.UNKNOWN
+            if action.opportunity_id:
+                opp = self.db.query(RevenueIntelligenceResult).filter(
+                    RevenueIntelligenceResult.id == action.opportunity_id
+                ).first()
+                if opp and opp.failure_category:
+                    category = opp.failure_category
+            elif payment and payment.failure_code:
+                category = FailureCategory.BANK_FAILURE
+
+            record = LearningOutcomeRecord(
+                merchant_id=action.merchant_id,
+                payment_id=action.payment_id,
+                recovery_action_id=action.id,
+                failure_category=category,
+                action_type=action.action_type,
+                amount_minor=payment.amount_minor if payment else 0,
+                retry_count=action.execution_attempts_count,
+                payment_method=payment.method if payment else "card",
+                outcome_status=outcome_status,
+                execution_latency_ms=latency_ms,
+                occurred_at=datetime.utcnow(),
+                context_metadata={
+                    "action_id": action.action_id,
+                    "idempotency_key": action.idempotency_key,
+                    "provider_reference": action.provider_reference,
+                },
+            )
+            self.db.add(record)
+            return record
+        except Exception as ex:
+            logger.error(f"failed_to_record_learning_outcome error={str(ex)}")
+            return None

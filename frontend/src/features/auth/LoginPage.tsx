@@ -67,6 +67,18 @@ export const LoginPage: React.FC = () => {
         <p className="mt-2 text-center text-xs text-gray-400">
           Multi-Tenant Adaptive AI Revenue Recovery Platform
         </p>
+
+        {/* 3D Showcase Banner Link */}
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => navigate('/landing')}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/20 to-pink-500/20 border border-indigo-500/40 text-xs font-semibold text-indigo-300 hover:text-white hover:border-pink-500/60 transition-all cursor-pointer shadow-sm"
+          >
+            <span>✨ View 3D Product Showcase & Live Simulator</span>
+            <ArrowRight className="w-3.5 h-3.5 text-pink-400" />
+          </button>
+        </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
@@ -191,7 +203,7 @@ export const LoginPage: React.FC = () => {
               <strong className="text-gray-200">Test Data Only:</strong> This environment contains only simulated recovery test data with zero risk to production financial systems.
             </p>
             <p className="text-[11px] leading-relaxed text-gray-400">
-              <strong className="text-gray-200">Production Ready:</strong> In production deployments with live payment gateways, access is strictly locked down using enterprise SSO and hardened multi-tenant RBAC permissions.
+              <strong className="text-gray-200">Production Ready:</strong> In production deployments with live payment gateways, access is strictly locked down using hardened SSO and multi-tenant RBAC permissions.
             </p>
           </div>
         </div>
