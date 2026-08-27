@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Union
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -526,26 +526,52 @@ class ExecutionService:
 
     def list_actions(
         self,
+        merchant_id: Optional[Union[str, uuid.UUID]] = None,
         status: Optional[str] = None,
         action_type: Optional[str] = None,
-        opportunity_id: Optional[str] = None,
-        payment_id: Optional[str] = None,
+        opportunity_id: Optional[Union[str, uuid.UUID]] = None,
+        payment_id: Optional[Union[str, uuid.UUID]] = None,
         page: int = 1,
         page_size: int = 20,
+        status_filter: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> Tuple[List[RecoveryAction], int]:
-        """List recovery actions with filtering and pagination."""
+        """List recovery actions with filtering, multi-tenant scoping, and pagination."""
         query = self.db.query(RecoveryAction)
-        if status:
-            query = query.filter(RecoveryAction.status == status)
+        
+        if merchant_id:
+            try:
+                m_uuid = uuid.UUID(str(merchant_id))
+                query = query.filter(RecoveryAction.merchant_id == m_uuid)
+            except (ValueError, TypeError):
+                query = query.filter(RecoveryAction.merchant_id == merchant_id)
+
+        effective_status = status or status_filter
+        if effective_status:
+            query = query.filter(RecoveryAction.status == effective_status)
         if action_type:
             query = query.filter(RecoveryAction.action_type == action_type)
         if opportunity_id:
-            query = query.filter(RecoveryAction.opportunity_id == opportunity_id)
+            try:
+                opp_uuid = uuid.UUID(str(opportunity_id))
+                query = query.filter(RecoveryAction.opportunity_id == opp_uuid)
+            except (ValueError, TypeError):
+                query = query.filter(RecoveryAction.opportunity_id == opportunity_id)
         if payment_id:
-            query = query.filter(RecoveryAction.payment_id == payment_id)
+            try:
+                pay_uuid = uuid.UUID(str(payment_id))
+                query = query.filter(RecoveryAction.payment_id == pay_uuid)
+            except (ValueError, TypeError):
+                query = query.filter(RecoveryAction.payment_id == payment_id)
 
+        effective_page_size = limit or page_size
         total = query.count()
-        actions = query.order_by(RecoveryAction.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        actions = (
+            query.order_by(RecoveryAction.created_at.desc())
+            .offset((page - 1) * effective_page_size)
+            .limit(effective_page_size)
+            .all()
+        )
         return actions, total
 
     def get_action(self, action_id: str) -> RecoveryAction:

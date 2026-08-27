@@ -51,9 +51,17 @@ app.add_middleware(
 async def global_exception_handler(request: Request, exc: Exception):
     """Ensure unhandled exceptions return valid JSON with CORS headers."""
     logger.error(f"unhandled_exception path={request.url.path} error={str(exc)}", exc_info=True)
+    origin = request.headers.get("origin") or "*"
+    headers = {
+        "Access-Control-Allow-Origin": origin if origin != "*" else "http://localhost:5173",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+    }
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error occurred.", "error": "INTERNAL_SERVER_ERROR"},
+        content={"detail": f"Internal server error: {str(exc)}", "error": "INTERNAL_SERVER_ERROR"},
+        headers=headers,
     )
 
 

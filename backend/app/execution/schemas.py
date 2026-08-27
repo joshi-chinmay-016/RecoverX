@@ -119,3 +119,12 @@ class ExecutionResultResponse(BaseModel):
     error_code: Optional[str] = None
     error_message: Optional[str] = None
     message: str
+
+
+class PaginatedRecoveryActionResponse(BaseModel):
+    """Paginated response for recovery actions."""
+    items: List[RecoveryActionResponse]
+    total: int
+    page: int
+    page_size: int
+

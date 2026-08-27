@@ -31,10 +31,14 @@ class AgentContextBuilder:
     
     def build_context(self, opportunity_id: str) -> AgentContext:
         """Build complete context for agent reasoning."""
-        # Get intelligence result to find payment
-        intelligence = self.db.query(RevenueIntelligenceResult).filter(
-            RevenueIntelligenceResult.id == opportunity_id
-        ).first()
+        import uuid
+        try:
+            opp_uuid = uuid.UUID(str(opportunity_id))
+            intelligence = self.db.query(RevenueIntelligenceResult).filter(
+                RevenueIntelligenceResult.id == opp_uuid
+            ).first()
+        except (ValueError, TypeError):
+            intelligence = None
         
         if not intelligence:
             raise ValueError(f"Intelligence result not found: {opportunity_id}")

@@ -37,12 +37,17 @@ async def analyze_opportunity(
 ):
     req = request or AgentRunRequest()
     """Run the AI recovery agent on an opportunity scoped to authenticated tenant."""
+    import uuid
+    try:
+        opp_uuid = uuid.UUID(str(opportunity_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Opportunity not found in tenant financial records")
     
     # Check if intelligence result exists and belongs to tenant
     intelligence = db.query(RevenueIntelligenceResult).join(
         Payment, RevenueIntelligenceResult.payment_id == Payment.id
     ).filter(
-        RevenueIntelligenceResult.id == opportunity_id,
+        RevenueIntelligenceResult.id == opp_uuid,
         Payment.merchant_id == tenant.merchant.id,
     ).first()
     
@@ -51,8 +56,8 @@ async def analyze_opportunity(
     
     # Check for existing run
     existing_run = db.query(AgentRunModel).filter(
-        AgentRunModel.opportunity_id == opportunity_id,
-        AgentRunModel.merchant_id == tenant.merchant.id,
+        AgentRunModel.opportunity_id == str(opportunity_id),
+        AgentRunModel.merchant_id == str(tenant.merchant.id),
         AgentRunModel.status.in_([AgentRunStatus.INVESTIGATING, AgentRunStatus.PLANNING, AgentRunStatus.VALIDATING]),
     ).first()
     
@@ -73,9 +78,9 @@ async def analyze_opportunity(
         # Persist agent run
         agent_run = AgentRunModel(
             run_id=state.run_id,
-            opportunity_id=state.opportunity_id,
-            payment_id=state.payment_id,
-            merchant_id=state.merchant_id,
+            opportunity_id=str(state.opportunity_id),
+            payment_id=str(state.payment_id),
+            merchant_id=str(tenant.merchant.id),
             current_step=state.current_step,
             status=state.status,
             context=state.context.model_dump(mode="json") if state.context else None,
@@ -138,10 +143,10 @@ async def list_agent_runs(
     db: Session = Depends(get_db),
 ):
     """List agent runs scoped to authenticated merchant tenant."""
-    query = db.query(AgentRunModel).filter(AgentRunModel.merchant_id == tenant.merchant.id)
+    query = db.query(AgentRunModel).filter(AgentRunModel.merchant_id == str(tenant.merchant.id))
     
     if opportunity_id:
-        query = query.filter(AgentRunModel.opportunity_id == opportunity_id)
+        query = query.filter(AgentRunModel.opportunity_id == str(opportunity_id))
     if status:
         query = query.filter(AgentRunModel.status == status)
         
@@ -185,7 +190,7 @@ async def get_agent_run(
     """Get an agent run by ID scoped to tenant."""
     agent_run = db.query(AgentRunModel).filter(
         AgentRunModel.run_id == run_id,
-        AgentRunModel.merchant_id == tenant.merchant.id,
+        AgentRunModel.merchant_id == str(tenant.merchant.id),
     ).first()
     
     if not agent_run:
@@ -222,7 +227,7 @@ async def get_agent_trace(
     """Get decision trace and tool activity for an agent run scoped to tenant."""
     agent_run = db.query(AgentRunModel).filter(
         AgentRunModel.run_id == run_id,
-        AgentRunModel.merchant_id == tenant.merchant.id,
+        AgentRunModel.merchant_id == str(tenant.merchant.id),
     ).first()
     
     if not agent_run:
@@ -243,10 +248,16 @@ async def preview_opportunity(
     db: Session = Depends(get_db),
 ):
     """Generate a plan without execution (dry run / preview) scoped to tenant."""
+    import uuid
+    try:
+        opp_uuid = uuid.UUID(str(opportunity_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Opportunity not found in tenant financial records")
+
     intelligence = db.query(RevenueIntelligenceResult).join(
         Payment, RevenueIntelligenceResult.payment_id == Payment.id
     ).filter(
-        RevenueIntelligenceResult.id == opportunity_id,
+        RevenueIntelligenceResult.id == opp_uuid,
         Payment.merchant_id == tenant.merchant.id,
     ).first()
     

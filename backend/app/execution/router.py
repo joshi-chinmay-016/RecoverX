@@ -14,6 +14,7 @@ from app.execution.schemas import (
     ExecuteActionRequest,
     RecoveryActionResponse,
     ExecutionResultResponse,
+    PaginatedRecoveryActionResponse,
     PolicyDecision,
 )
 from app.core.logging import get_logger
@@ -32,11 +33,17 @@ def create_actions_from_plan(
     """Synthesize structured recovery actions from an approved Phase 3 Agent Recovery Plan scoped to tenant."""
     from app.db.models.revenue_intelligence import RevenueIntelligenceResult
     from app.db.models.payment import Payment
+    import uuid
+
+    try:
+        opp_uuid = uuid.UUID(str(opportunity_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Opportunity not found in tenant financial records.")
 
     intel = db.query(RevenueIntelligenceResult).join(
         Payment, RevenueIntelligenceResult.payment_id == Payment.id
     ).filter(
-        RevenueIntelligenceResult.id == opportunity_id,
+        RevenueIntelligenceResult.id == opp_uuid,
         Payment.merchant_id == tenant.merchant.id,
     ).first()
 
@@ -63,11 +70,17 @@ def create_action(
     """Create a new proposed recovery action scoped to tenant."""
     from app.db.models.revenue_intelligence import RevenueIntelligenceResult
     from app.db.models.payment import Payment
+    import uuid
+
+    try:
+        opp_uuid = uuid.UUID(str(request.opportunity_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Opportunity not found in tenant financial records.")
 
     intel = db.query(RevenueIntelligenceResult).join(
         Payment, RevenueIntelligenceResult.payment_id == Payment.id
     ).filter(
-        RevenueIntelligenceResult.id == str(request.opportunity_id),
+        RevenueIntelligenceResult.id == opp_uuid,
         Payment.merchant_id == tenant.merchant.id,
     ).first()
 
@@ -81,7 +94,8 @@ def create_action(
             action_type=request.action_type,
             parameters=request.parameters,
             recovery_plan_id=request.recovery_plan_id,
-            agent_run_id=str(request.agent_run_id) if request.agent_run_id else None,
+            agent_run_id=request.agent_run_id,
+            merchant_id=str(tenant.merchant.id),
         )
         return action
     except ValueError as e:
@@ -240,17 +254,33 @@ def get_action(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("", response_model=List[RecoveryActionResponse])
+@router.get("", response_model=PaginatedRecoveryActionResponse)
 def list_actions(
     status: Optional[str] = Query(None, description="Filter by action status"),
-    limit: int = Query(50, ge=1, le=100),
+    action_type: Optional[str] = Query(None, description="Filter by action type"),
+    opportunity_id: Optional[str] = Query(None, description="Filter by opportunity ID"),
+    payment_id: Optional[str] = Query(None, description="Filter by payment ID"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=100, description="Page size"),
+    limit: Optional[int] = Query(None, ge=1, le=100),
     tenant: TenantContext = Depends(get_current_tenant),
     db: Session = Depends(get_db),
 ):
     """List recovery actions scoped to the authenticated tenant."""
     service = ExecutionService(db)
-    return service.list_actions(
+    effective_page_size = limit or page_size
+    actions, total = service.list_actions(
         merchant_id=str(tenant.merchant.id),
-        status_filter=status,
-        limit=limit,
+        status=status,
+        action_type=action_type,
+        opportunity_id=opportunity_id,
+        payment_id=payment_id,
+        page=page,
+        page_size=effective_page_size,
     )
+    return {
+        "items": actions,
+        "total": total,
+        "page": page,
+        "page_size": effective_page_size,
+    }
