@@ -53,7 +53,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"unhandled_exception path={request.url.path} error={str(exc)}", exc_info=True)
     origin = request.headers.get("origin") or "*"
     headers = {
-        "Access-Control-Allow-Origin": origin if origin != "*" else "http://localhost:5173",
+        "Access-Control-Allow-Origin": origin if origin != "*" else "https://recover-x-sage.vercel.app",
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Methods": "*",
         "Access-Control-Allow-Headers": "*",

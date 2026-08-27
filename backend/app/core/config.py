@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_hours: int = 8
     cors_origins: Union[List[str], str] = [
+        "https://recover-x-sage.vercel.app",
         "http://localhost:5173",
         "http://localhost:5174",
         "http://localhost:5175",
@@ -59,7 +60,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
         "http://127.0.0.1:8080",
     ]
-    cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:[0-9]+)?$"
+    cors_origin_regex: str = r"^(https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:[0-9]+)?|https://recover-x[a-zA-Z0-9-]*\.vercel\.app)$"
     login_rate_limit_attempts: int = 15
     login_rate_limit_window_seconds: int = 60
 
