@@ -46,6 +46,9 @@ frontend/build/
 *.env
 .env.*
 !.env.example
+!frontend/.env.example
+!frontend/.env.production
+!backend/.env.example
 
 # IDE
 .vscode/
