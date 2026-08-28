@@ -130,6 +130,78 @@ class TestWebhookProcessing:
         
         assert response.status_code == 200
     
+    def test_nested_razorpay_webhook_payload(self, client, db, webhook_secret, monkeypatch):
+        """Test processing of standard nested Razorpay webhook payload structure."""
+        from app.core.config import settings
+        monkeypatch.setattr(settings, 'razorpay_webhook_secret', webhook_secret)
+        
+        unique_suffix = uuid.uuid4().hex[:8]
+        pay_id = f"pay_{unique_suffix}"
+        
+        # Standard Razorpay webhook structure
+        payload = {
+            "entity": "event",
+            "account_id": "acc_test123",
+            "event": "payment.failed",
+            "contains": ["payment"],
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": pay_id,
+                        "entity": "payment",
+                        "amount": 499900,
+                        "currency": "INR",
+                        "status": "failed",
+                        "order_id": f"order_{unique_suffix}",
+                        "method": "card",
+                        "email": "customer@recoverx.io",
+                        "contact": "+919876543210",
+                        "error_code": "GATEWAY_TECHNICAL_ERROR",
+                        "error_description": "Gateway – Technical Error",
+                        "error_source": "gateway",
+                        "error_step": "payment_authorization",
+                        "error_reason": "payment_failed"
+                    }
+                }
+            },
+            "created_at": 1724800000
+        }
+        
+        payload_bytes = json.dumps(payload).encode('utf-8')
+        signature = self._sign_payload(payload, webhook_secret)
+        
+        response = client.post(
+            "/api/v1/webhooks/razorpay",
+            content=payload_bytes,
+            headers={
+                "Content-Type": "application/json",
+                "x-razorpay-signature": signature,
+                "x-razorpay-event-id": f"evt_{unique_suffix}"
+            }
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "received"
+        
+        # Verify payment was created with correct amount and customer
+        payment = db.query(Payment).filter(Payment.razorpay_payment_id == pay_id).first()
+        assert payment is not None
+        assert payment.status == PaymentStatus.FAILED
+        assert payment.amount_minor == 499900
+        
+        # Verify recovery case exists
+        recovery_case = db.query(RecoveryCase).filter(RecoveryCase.payment_id == payment.id).first()
+        assert recovery_case is not None
+        assert recovery_case.status == RecoveryCaseStatus.OPEN
+        assert recovery_case.amount_at_risk_minor == 499900
+        
+        # Verify payment attempt exists with failure details
+        assert len(payment.attempts) >= 1
+        attempt = payment.attempts[0]
+        assert attempt.failure_code == "GATEWAY_TECHNICAL_ERROR"
+        assert attempt.failure_description == "Gateway – Technical Error"
+
     def test_invalid_signature_rejected(self, client, webhook_secret, monkeypatch):
         """Test that invalid signature is rejected."""
         from app.core.config import settings

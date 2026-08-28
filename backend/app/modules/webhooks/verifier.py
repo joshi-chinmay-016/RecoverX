@@ -42,7 +42,7 @@ class WebhookVerifier:
         # Extract signature header
         signature = request.headers.get("x-razorpay-signature")
         if not signature:
-            logger.warning("webhook_missing_signature")
+            logger.warning("webhook_missing_signature path=%s body_bytes=%d", request.url.path, len(raw_body))
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Missing signature header"
@@ -50,11 +50,18 @@ class WebhookVerifier:
         
         # Verify signature
         if not WebhookVerifier.verify_signature(raw_body, signature):
-            logger.warning("webhook_invalid_signature")
+            secret_len = len(settings.razorpay_webhook_secret) if settings.razorpay_webhook_secret else 0
+            logger.warning(
+                "webhook_invalid_signature path=%s body_bytes=%d secret_configured_len=%d signature_prefix=%s",
+                request.url.path,
+                len(raw_body),
+                secret_len,
+                signature[:8] if signature else "none"
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid signature"
             )
         
-        logger.info("webhook_signature_verified")
+        logger.info("webhook_signature_verified path=%s body_bytes=%d", request.url.path, len(raw_body))
         return raw_body, signature

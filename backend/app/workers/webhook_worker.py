@@ -101,6 +101,15 @@ class WebhookWorker:
         # Create recovery case
         recovery_service.create_recovery_case_for_payment(payment)
         
+        # Trigger Revenue Intelligence analysis
+        try:
+            from app.intelligence.intelligence_service import RevenueIntelligenceService
+            intel_service = RevenueIntelligenceService(db)
+            intel_service.analyze_payment(payment)
+            logger.info(f"worker_revenue_intelligence_analyzed payment_id={payment.id}")
+        except Exception as intel_err:
+            logger.warning(f"worker_revenue_intelligence_deferred payment_id={payment.id} error={str(intel_err)}")
+
         # Create audit event
         AuditService.create_audit_event(
             db=db,
